@@ -1,11 +1,13 @@
 package org.example.model;
 
+import org.example.model.Systems.NetworkSystem;
+
 import java.awt.*;
 import java.util.List;
 
 public class Port {
     private final int clickRadius;
-    private final String type; // "square" | "triangle"
+    private  String type;
     private final int side;    // -1 input, 1 output
     private final NetworkSystem parentSystem;
     private double x, y;
@@ -68,4 +70,8 @@ public class Port {
         }
         return length;
     }
+    public double getCenterX() { return x + getVisualSize() / 2.0; }
+    public double getCenterY() { return y + getVisualSize() / 2.0; }
+    public int getVisualSize() { return 15; }
+    public void setType(String t) { this.type = t; }
 }

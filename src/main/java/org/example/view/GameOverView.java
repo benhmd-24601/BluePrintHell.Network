@@ -1,13 +1,14 @@
+// src/main/java/org/example/view/GameOverView.java
 package org.example.view;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionListener;
 
-public class GameOverScreen extends JPanel {
-    private final JButton returnButton;
+public class GameOverView extends JPanel {
+    private final JButton returnButton = new JButton("Return to Menu");
+    private final JLabel lossLabel = new JLabel("", SwingConstants.CENTER);
 
-    public GameOverScreen(double lossPercent) {
+    public GameOverView() {
         setBackground(new Color(25, 25, 25));
         setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
@@ -18,13 +19,11 @@ public class GameOverScreen extends JPanel {
         gbc.gridx = 0; gbc.gridy = 0; gbc.insets = new Insets(20, 20, 10, 20);
         add(title, gbc);
 
-        JLabel lossLabel = new JLabel(String.format("Packet Loss: %.1f%%", lossPercent));
         lossLabel.setFont(new Font("Consolas", Font.PLAIN, 24));
         lossLabel.setForeground(Color.WHITE);
         gbc.gridy = 1; gbc.insets = new Insets(0, 20, 30, 20);
         add(lossLabel, gbc);
 
-        returnButton = new JButton("Return to Menu");
         styleButton(returnButton);
         returnButton.setPreferredSize(new Dimension(250, 50));
         gbc.gridy = 2; gbc.insets = new Insets(0, 20, 20, 20);
@@ -39,5 +38,13 @@ public class GameOverScreen extends JPanel {
         b.setFont(new Font("Consolas", Font.PLAIN, 18));
     }
 
-    public void addReturnButtonListener(ActionListener listener) { returnButton.addActionListener(listener); }
+    /** فقط UI را آپدیت می‌کند؛ لاجیک ندارد */
+    public void setLossPercent(double lossPercent) {
+        lossLabel.setText(String.format("Packet Loss: %.1f%%", lossPercent));
+    }
+
+    /** کنترلر خودش لیسنر می‌چسباند؛ ویو فقط accessor می‌دهد */
+    public JButton getReturnButton() {
+        return returnButton;
+    }
 }

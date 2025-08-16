@@ -1,5 +1,7 @@
 package org.example.model;
 
+import org.example.model.Systems.NetworkSystem;
+
 import java.util.List;
 
 public class Stage {

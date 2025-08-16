@@ -1,4 +1,10 @@
-package org.example.model;
+package org.example.model.Systems;
+
+import org.example.model.GameEnv;
+import org.example.model.Packet.Packet;
+import org.example.model.PacketQueue;
+import org.example.model.Port;
+import org.example.model.Wire;
 
 import java.util.*;
 
@@ -28,6 +34,8 @@ public class NetworkSystem {
             inputPorts.add(new Port("triangle", -1, this, x - 15, y + 2 * spacing, true));
             outputPorts.add(new Port("square", 1, this, x + 120, y + spacing, true));
             outputPorts.add(new Port("triangle", 1, this, x + 120, y + 2 * spacing, true));
+            this.setEnabled(false);
+
         } else if (type == 2) {
             inputPorts.add(new Port("square", -1, this, x - 15, y + spacing - 20, true));
             inputPorts.add(new Port("triangle", -1, this, x - 15, y + 2 * spacing - 20, true));
@@ -36,8 +44,12 @@ public class NetworkSystem {
             outputPorts.add(new Port("square", 1, this, x + 120, y + spacing, true));
             outputPorts.add(new Port("triangle", 1, this, x + 120, y + 2 * spacing, true));
         } else if (type == 3) {
-            inputPorts.add(new Port("triangle", -1, this, x - 15, y + 2 * spacing - 20, true));
+            inputPorts.add(new Port("square", -1, this, x - 15, y + spacing, true));
+            inputPorts.add(new Port("triangle", -1, this, x - 15, y + 2 * spacing, true));
+            outputPorts.add(new Port("square", 1, this, x + 120, y + spacing, true));
             outputPorts.add(new Port("triangle", 1, this, x + 120, y + 2 * spacing, true));
+//            inputPorts.add(new Port("triangle", -1, this, x - 15, y + 2 * spacing - 20, true));
+//            outputPorts.add(new Port("triangle", 1, this, x + 120, y + 2 * spacing, true));
         } else if (type == 4) {
             inputPorts.add(new Port("square", -1, this, x - 15, y + spacing, true));
             outputPorts.add(new Port("square", 1, this, x + 120, y + spacing, true));
@@ -66,25 +78,17 @@ public class NetworkSystem {
     public Packet getNextPacketForWire(String startPortType, List<Wire> allWires) {
         if (packetStorage.isEmpty()) return null;
 
-        for (Packet packet : packetStorage) {
-            if (packet.getType().equals(startPortType)) {
+        // اول پکت‌های سازگار با این startPortType
+        for (Packet packet : new ArrayList<>(packetStorage)) {
+            if (packet.canEnterWireWithStartType(startPortType)) {
                 packetStorage.remove(packet);
                 return packet;
             }
         }
-        List<Wire> freeWires = new ArrayList<>();
-        for (Wire wire : allWires) if (!wire.isBusy()) freeWires.add(wire);
-
-        if (!freeWires.isEmpty()) {
-            for (Packet packet : packetStorage) {
-                Wire randomFree = freeWires.get(new Random().nextInt(freeWires.size()));
-                if (randomFree.getStartPortType().equals(startPortType)) {
-                    packetStorage.remove(packet);
-                    return packet;
-                }
-            }
-        }
-        return null;
+        // اگر نبود، هر پکت موجود (برخی پکت‌ها مثل محرمانه/حجیم سازگاری ندارند → قبول)
+        Packet any = packetStorage.get(0);
+        packetStorage.remove(0);
+        return any;
     }
 
     public List<Wire> getAllConnectedWires() {
@@ -114,8 +118,12 @@ public class NetworkSystem {
     public void addPacket(Packet packet) {
         if (canStorePacket()) {
             packetStorage.add(packet);
-            PacketQueue queue = inputQueues.get(packet.getType());
-            if (queue != null) queue.addPacket(packet);
+
+            String key = packet.getPortKey(); // به‌جای getType()
+            if (key != null) {
+                PacketQueue q = inputQueues.get(key);
+                if (q != null) q.addPacket(packet);
+            }
         } else {
             packetsDropped++;
         }
@@ -149,4 +157,10 @@ public class NetworkSystem {
     public double getY() { return y; }
 
     public ArrayList<Packet> getPacketStorage() { return new ArrayList<>(packetStorage); }
+
+//***********************************************************************
+    private boolean enabled = true;
+    public boolean isEnabled() { return enabled; }
+    public void setEnabled(boolean enabled) { this.enabled = enabled; }
+
 }

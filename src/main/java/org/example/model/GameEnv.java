@@ -1,5 +1,10 @@
 package org.example.model;
 
+import org.example.model.Packet.Packet;
+import org.example.model.Systems.NetworkSystem;
+import org.example.model.Systems.SinkSystem;
+import org.example.model.Systems.SourceSystem;
+
 import javax.swing.*;
 import java.util.*;
 
@@ -109,7 +114,6 @@ public class GameEnv {
 
     // region Game loop
     private long lastPowerUpdateTime;
-
     public void update(double delta) {
         long currentTime = System.currentTimeMillis();
         if (lastPowerUpdateTime == 0) lastPowerUpdateTime = currentTime;
@@ -125,9 +129,16 @@ public class GameEnv {
         }
         lastPowerUpdateTime = currentTime;
 
+        // تولید مثل قبل (خود سورس با isGenerating کنترل می‌کند)
         generate(delta);
-        processWires(delta);
-        cleanup();
+
+        // ✦ نکته اصلی: وقتی pause هستیم حرکت/سیم‌ها را آپدیت نکن
+        if (!movementPaused) {
+            processWires(delta);
+            cleanup();              // برخوردها و ایمپکت‌ها هم اینجا انجام می‌شوند
+        }
+        // اگر خواستی، می‌تونی remove-delivered را خارج از pause نگه داری،
+        // ولی وقتی pause هستیم کسی تحویل نمی‌شود، پس فرقی نمی‌کند.
 
         if (!gameOverFired && isGameOver()) {
             gameOverFired = true;
@@ -200,18 +211,13 @@ public class GameEnv {
     }
 
     public void cleanup() {
-        // remove delivered
-        packets.removeIf(packet -> {
-            if (packet.reachedDestination()) {
-                if (packet.getWire() != null && packet.getWire().getEndSystem() instanceof SinkSystem) {
-                    // reached sink
-                }
-                return true;
-            }
-            return false;
-        });
+        // ✅ در مدل جدید تحویل توسط Wire انجام می‌شود.
+        // اگر پکتی دیگر currentPacket سیمش نیست (یا wire اش null شد) یعنی تحویل/حذف شده:
+        packets.removeIf(p ->
+                p.getWire() == null || (p.getWire().getCurrentPacket() != p)
+        );
 
-        // collisions
+        // collisions (مثل قبل)
         for (int i = 0; i < packets.size(); i++) {
             Packet p1 = packets.get(i);
             for (int j = i + 1; j < packets.size(); j++) {
@@ -227,6 +233,7 @@ public class GameEnv {
             }
         }
     }
+
 
     private boolean areColliding(Packet p1, Packet p2) {
         double dx = p1.getX() - p2.getX();
@@ -329,4 +336,13 @@ public class GameEnv {
             case "Atar" -> setActiveAtar(true);
         }
     }
+
+    // داخل کلاس GameEnv
+    private boolean movementPaused = false;
+
+    public boolean isMovementPaused() { return movementPaused; }
+    public void setMovementPaused(boolean paused) { this.movementPaused = paused; }
+    public void pauseMovement() { movementPaused = true; }
+    public void resumeMovement() { movementPaused = false; }
+
 }

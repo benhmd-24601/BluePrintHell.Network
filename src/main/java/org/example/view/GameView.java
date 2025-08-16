@@ -1,12 +1,13 @@
 package org.example.view;
 
 import org.example.controller.GameLoop;
-import org.example.controller.MouseHandler;
 import org.example.model.*;
+import org.example.model.Packet.Packet;
+import org.example.model.Systems.NetworkSystem;
+import org.example.model.Systems.SinkSystem;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.geom.QuadCurve2D;
 import java.util.List;
 import java.util.Objects;
 
@@ -159,7 +160,7 @@ public class GameView extends JPanel {
 
         drawHUD(g2d);
         for (NetworkSystem system : env.getSystems()) drawNetworkSystem(g2d, system);
-        drawCurveWires(g2d, env.getWires());
+        drawStraightWires(g2d, env.getWires());
         drawPackets(g2d, env.getPackets());
         drawTimeline(g2d);
         drawDraggingWire(g2d);
@@ -272,7 +273,7 @@ public class GameView extends JPanel {
             int x = startX + col * hGap;
             int y = startY + row * vGap;
 
-            if (Objects.equals(p.getType(), "square")) {
+            if (Objects.equals(p.getPortKey(), "square")) {
                 g2d.setColor(Color.GREEN);
                 g2d.fillRect(x, y, 10, 10);
             } else {
@@ -287,19 +288,31 @@ public class GameView extends JPanel {
         }
     }
 
-    private void drawCurveWires(Graphics2D g2d, List<Wire> wires) {
-        for (Wire wire : wires) {
-            for (int i = 0; i < wire.getPoints().size() - 2; i += 2) {
-                Point start = wire.getPoints().get(i);
-                Point control = wire.getPoints().get(i + 1);
-                Point end = wire.getPoints().get(i + 2);
-                g2d.setColor(Objects.equals(wire.getStartPortType(), "square") ? Color.GREEN : Color.YELLOW);
-                QuadCurve2D q = new QuadCurve2D.Float();
-                q.setCurve(start.getX(), start.getY() , control.getX(), control.getY() - 20, end.getX(), end.getY() );
-                g2d.draw(q);
-            }
-        }
+//    private void drawCurveWires(Graphics2D g2d, List<Wire> wires) {
+//        for (Wire wire : wires) {
+//            for (int i = 0; i < wire.getPoints().size() - 2; i += 2) {
+//                Point start = wire.getPoints().get(i);
+//                Point control = wire.getPoints().get(i + 1);
+//                Point end = wire.getPoints().get(i + 2);
+//                g2d.setColor(Objects.equals(wire.getStartPortType(), "square") ? Color.GREEN : Color.YELLOW);
+//                QuadCurve2D q = new QuadCurve2D.Float();
+//                q.setCurve(start.getX(), start.getY() , control.getX(), control.getY() - 20, end.getX(), end.getY() );
+//                g2d.draw(q);
+//            }
+//        }
+//    }
+private void drawStraightWires(Graphics2D g2d, List<Wire> wires) {
+    for (Wire wire : wires) {
+        int x1 = (int) wire.getStartx();
+        int y1 = (int) wire.getStarty();
+        int x2 = (int) wire.getEndX();
+        int y2 = (int) wire.getEndY();
+
+        g2d.setStroke(new BasicStroke(2f));
+        g2d.setColor(Objects.equals(wire.getStartPortType(), "square") ? Color.GREEN : Color.YELLOW);
+        g2d.drawLine(x1, y1, x2, y2);
     }
+}
 
     private void drawPackets(Graphics g, List<Packet> packets) {
         for (Packet p : packets) {
@@ -307,9 +320,9 @@ public class GameView extends JPanel {
             int drawX = (int) p.getX();
             int drawY = (int) p.getY() + 5;
 
-            boolean mismatch = !Objects.equals(p.getType(), p.getWire().getStartPortType());
+            boolean mismatch = !Objects.equals(p.getPortKey(), p.getWire().getStartPortType());
             if (mismatch) g.setColor(new Color(255, 165, 0));
-            if (p.getType().equals("square")) {
+            if (p.getPortKey().equals("square")) {
                 if (!mismatch) g.setColor(Color.GREEN);
                 g.fillRect(drawX, drawY, 10, 10);
             } else {

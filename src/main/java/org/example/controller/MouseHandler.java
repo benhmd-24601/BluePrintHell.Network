@@ -1,13 +1,13 @@
 package org.example.controller;
 
 import org.example.model.*;
+import org.example.model.Systems.NetworkSystem;
 import org.example.util.Debug;
 
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.*;
-import java.util.List;
 
 public class MouseHandler extends MouseAdapter {
     private final GameEnv env;
@@ -131,20 +131,20 @@ public class MouseHandler extends MouseAdapter {
                     startPort.setEmpty(false);
                     endPort.setEmpty(false);
 
-                    List<Point> points = new ArrayList<>();
-                    points.add(new Point((int) startPort.getX(), (int) startPort.getY()));
-                    points.add(new Point((int) startPort.getX() + 25, (int) startPort.getY()));
-                    points.add(new Point((int) (startPort.getX() + endPort.getX()) / 2,
-                            (int) (startPort.getY() + endPort.getY()) / 2));
-                    points.add(new Point((int) endPort.getX() - 25, (int) endPort.getY()));
-                    points.add(new Point((int) endPort.getX(), (int) endPort.getY()));
+                    // از مرکز پورت‌ها استفاده کن تا خط دقیق به وسط شکل‌ها بخورد
+                    double sx = startPort.getCenterX();
+                    double sy = startPort.getCenterY();
+                    double ex = endPort.getCenterX();
+                    double ey = endPort.getCenterY();
+
+                    // دیگر نیازی به points برای منحنی نداریم
+                    java.util.List<Point> points = java.util.Collections.emptyList();
 
                     Wire newWire = new Wire(
                             startPort, endPort,
                             startPort.getSystem(), startPort.getType(),
                             endPort.getSystem(), endPort.getType(),
-                            length, startPort.getX(), startPort.getY(),
-                            endPort.getX(), endPort.getY(),
+                            length, sx, sy, ex, ey,
                             points, env
                     );
                     startPort.getSystem().addOutputWire(newWire);
@@ -174,4 +174,6 @@ public class MouseHandler extends MouseAdapter {
         }
         return null;
     }
+  // هم‌اندازه portSize در View
+
 }

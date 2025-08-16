@@ -1,8 +1,10 @@
 package org.example.controller;
 
+import org.example.model.GameOverModel;
 import org.example.util.SaveManager;
 import org.example.util.SoundManager;
 import org.example.util.UiUtil;
+import org.example.view.GameOverView;
 import org.example.view.LevelSelectionView;
 import org.example.view.MainMenuView;
 import org.example.view.SettingsMenu;
@@ -111,5 +113,20 @@ public class AppController {
             gameController = null;
         }
         showMainMenu();
+    }
+    // AppController
+    public void showGameOver(double lossPct) {
+        GameOverModel model = new GameOverModel(lossPct);
+        GameOverView view = new GameOverView();
+        GameOverController controller = new GameOverController(
+                model, view,
+                this::returnFromGameToMenu
+        );
+        controller.init();
+
+        root.add(view, "gameover");
+        cards.show(root, "gameover");
+        frame.revalidate();
+        frame.repaint();
     }
 }

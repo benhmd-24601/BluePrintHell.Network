@@ -1,5 +1,8 @@
 package org.example.model;
 
+import org.example.model.Packet.Packet;
+import org.example.model.Systems.NetworkSystem;
+
 import java.util.LinkedList;
 import java.util.Queue;
 
@@ -14,7 +17,7 @@ public class PacketQueue {
     }
 
     public void addPacket(Packet packet) {
-        if (packet.getType().equals(portType)) queue.add(packet);
+        if (packet.getPortKey().equals(portType)) queue.add(packet);
     }
 
     public boolean removePacket(Packet packet) { return queue.remove(packet); }

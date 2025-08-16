@@ -1,10 +1,12 @@
 package org.example.controller;
 
 import org.example.model.*;
+import org.example.model.Systems.NetworkSystem;
+import org.example.model.Systems.SourceSystem;
 import org.example.util.SoundManager;
-import org.example.view.GameOverScreen;
+import org.example.view.GameOverView;
+import org.example.view.GameOverView;
 import org.example.view.GameView;
-import org.example.view.StoreView;
 
 import javax.swing.*;
 import java.awt.*;
@@ -112,7 +114,7 @@ public class GameController {
     }
 
     private void handleSourceButtonClick(SourceSystem source, JButton button) {
-        // 1. بررسی وضعیت اتصال سیستم‌ها
+        // 1) آیا همه‌ی سیستم‌ها متصل‌اند؟ (همون منطق قبلی خودت)
         boolean allConnected = true;
         for (NetworkSystem system : env.getSystems()) {
             if (!system.isSourceSystem() && !system.isIndicatorOn()) {
@@ -120,14 +122,19 @@ public class GameController {
                 break;
             }
         }
+        if (!allConnected) return;
 
-        // 2. تغییر وضعیت فقط اگر همه سیستم‌ها متصل باشند
-        if (allConnected) {
-            source.setGenerating(!source.isGenerating());
-            button.setText(source.isGenerating() ? "❚❚" : "◀");
+        // 2) Play ⇄ Pause
+        boolean nextRunning = !source.isGenerating(); // مثل قبل تولید سورس را هم toggle کنیم
+        source.setGenerating(nextRunning);
 
-        }
+        // ✦ نکته اصلی: حرکت سراسری را هم با همان دکمه pause/resume کنیم
+        env.setMovementPaused(!nextRunning);
+
+        // 3) UI
+        button.setText(nextRunning ? "❚❚" : "◀"); // در حال اجرا = pause icon، در حال توقف = play icon
     }
+
 
     private void createPowerButtons() {
         // ساخت پنل نوار قدرت
@@ -200,18 +207,13 @@ public class GameController {
         anaToggle.setSelected(env.isActiveAnahita());
     }
 
-
     private void showGameOver() {
-        double lossPct = env.getTotalPacketLossPercent();
-        GameOverScreen over = new GameOverScreen(lossPct);
-        over.addReturnButtonListener(e -> {
-            SoundManager.stopBackgroundMusic();
-            app.returnFromGameToMenu();
+        SwingUtilities.invokeLater(() -> {
+            if (gameLoop != null && gameLoop.isRunning()) gameLoop.stop();
+            app.showGameOver(env.getTotalPacketLossPercent());
         });
-        app.getFrame().setContentPane(over);
-        app.getFrame().revalidate();
-        app.getFrame().repaint();
     }
+
 
     public JComponent getView() {
         return gameView;

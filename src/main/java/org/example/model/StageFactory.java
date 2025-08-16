@@ -1,5 +1,9 @@
 package org.example.model;
 
+import org.example.model.Systems.NetworkSystem;
+import org.example.model.Systems.SinkSystem;
+import org.example.model.Systems.SourceSystem;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,7 +12,7 @@ public class StageFactory {
     public static Stage createStage1() {
         List<NetworkSystem> systems = new ArrayList<>();
         systems.add(new SourceSystem(100, 400, 8, 5));
-        systems.add(new NetworkSystem(350, 250, 1));
+        systems.add(new NetworkSystem(350, 250, 3));
         systems.add(new NetworkSystem(600, 300, 1));
         systems.add(new SinkSystem(800, 400, 8));
         return new Stage(systems, 10000, 120, 50.0);

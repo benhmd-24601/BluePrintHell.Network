@@ -1,6 +1,8 @@
 package org.example.util;
 
 import org.example.model.*;
+import org.example.model.Systems.NetworkSystem;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 

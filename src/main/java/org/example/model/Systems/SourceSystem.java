@@ -1,8 +1,13 @@
-package org.example.model;
+package org.example.model.Systems;
 
-import javax.swing.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import org.example.model.GameEnv;
+import org.example.model.Packet.CirclePacket;
+import org.example.model.Packet.Packet;
+import org.example.model.Packet.SquarePacket;
+import org.example.model.Packet.TrianglePacket;
+import org.example.model.Port;
+import org.example.model.Wire;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,6 +21,8 @@ public class SourceSystem extends NetworkSystem {
     //    private final JButton generateButton;
     private int allpackets;
 
+    private int nextKind = 0;
+
     public SourceSystem(double x, double y, int packetCount, int generationFrequency) {
         super(x, y, 1);
         this.allpackets = packetCount;
@@ -23,23 +30,6 @@ public class SourceSystem extends NetworkSystem {
         this.generationFrequency = generationFrequency;
         getInputPorts().clear();
 
-//        generateButton = new JButton("◀");
-//        generateButton.addActionListener(new ActionListener() {
-//            @Override
-//            public void actionPerformed(ActionEvent e) {
-//                boolean canStart = true;
-//                for (NetworkSystem system : env.getSystems()) {
-//                    if (!system.isIndicatorOn() && !system.isSourceSystem()) {
-//                        canStart = false; break;
-//                    }
-//                }
-//                if (canStart) {
-//                    isGenerating = !isGenerating;
-//                    generateButton.setText(isGenerating ? "❚❚" : "◀");
-//                    generateButton.setToolTipText(isGenerating ? "Pause" : "Play");
-//                }
-//            }
-//        });
     }
 
     public int getAllpackets() {
@@ -58,16 +48,26 @@ public class SourceSystem extends NetworkSystem {
         List<Packet> generated = new ArrayList<>();
         if (tickCounter >= generationFrequency && packetCount > 0) {
             tickCounter = 0;
-            String type = alternateType ? "square" : "triangle";
-            alternateType = !alternateType;
 
-            Packet packet = new Packet(type, getX() + 60, getY() + 80);
+            Packet packet;
+            if (nextKind == 0) {
+                packet = new SquarePacket(getX() + 60, getY() + 80);
+            } else if (nextKind == 1) {
+                packet = new TrianglePacket(getX() + 60, getY() + 80);
+            } else {
+                packet = new CirclePacket(getX() + 60, getY() + 80);
+            }
+            nextKind = (nextKind + 1) % 3;
+
             Wire suitableWire = findSuitableWireForPacket(packet);
-            if (suitableWire != null) {
-                suitableWire.setCurrentPacket(packet);
-                packet.setWire(suitableWire);
+            if (suitableWire != null && (suitableWire.getEndSystem() == null || suitableWire.getEndSystem().isEnabled())) {
+                // پیشنهاد: برای اطمینان از فعال‌بودن مقصد همین‌جا هم چک شود
+                suitableWire.setCurrentPacket(packet);  // setWire → onEnterWireConfigure + بوست
                 generated.add(packet);
                 packetCount--;
+            } else {
+                // سیمی برای حرکت پیدا نشد — می‌تونی packet را دور بیندازی
+                // یا برای تلاش مجدد نگه داری؛ فعلاً کاری نمی‌کنیم
             }
         }
         allPackets.addAll(generated);
@@ -76,7 +76,7 @@ public class SourceSystem extends NetworkSystem {
 
     private Wire findSuitableWireForPacket(Packet packet) {
         for (Port out : getOutputPorts()) {
-            if (out.getType().equals(packet.getType())) {
+            if (out.getType().equals(packet.getPortKey())) {
                 Wire connected = env.findWireByStartPort(out);
                 if (connected != null && !connected.isBusy()) return connected;
             }
