@@ -19,7 +19,8 @@ public abstract class Packet {
     protected Wire wire;
     protected double progress = 0.0;
     protected int direction = +1;               // +1 جلو، -1 عقب
-    protected double timeOnThisWire = 0.0;
+    private long lastUpdateNs = 0;
+    private double timeOnThisWireSec = 0.0;
 
     // حرکت
     protected double speed = BASE_SPEED_MSG;    // سرعت لحظه‌ای
@@ -45,7 +46,8 @@ public abstract class Packet {
     public Wire getWire() { return wire; }
     public void setWire(Wire w) {
         this.wire = w;
-        this.timeOnThisWire = 0.0;
+        this.timeOnThisWireSec = 0.0;
+        this.lastUpdateNs = System.nanoTime();
         if (direction > 0) this.progress = 0.0; else this.progress = w.getLength();
         onEnterWire(w);
     }
@@ -114,12 +116,17 @@ public abstract class Packet {
     public void updatePosition(double delta) {
         if (wire == null) return;
 
-        timeOnThisWire += delta;
-        if (timeOnThisWire > PACKET_WIRE_TIMEOUT) {
+        long now = System.nanoTime();
+        if (lastUpdateNs == 0) lastUpdateNs = now;
+        timeOnThisWireSec += (now - lastUpdateNs) / 1_000_000_000.0;
+        lastUpdateNs = now;
+
+        if (timeOnThisWireSec > PACKET_WIRE_TIMEOUT) {
             wire.getEnv().markAsLost(this);
             if (wire.getCurrentPacket() == this) wire.setCurrentPacket(null);
             return;
         }
+
 
         // v = v0 + a*dt
         speed += accel * delta;

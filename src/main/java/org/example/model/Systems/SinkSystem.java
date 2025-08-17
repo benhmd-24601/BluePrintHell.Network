@@ -16,7 +16,7 @@ public class SinkSystem extends NetworkSystem {
     private int sinkCapacity = 10;
 
     public SinkSystem(double x, double y, int capacity) {
-        super(x, y, 1);
+        super(x, y, 3);
         this.sinkCapacity = capacity;
         getOutputPorts().clear();
     }
@@ -52,4 +52,5 @@ public class SinkSystem extends NetworkSystem {
         double v = bulkSize - bulkSize * Math.pow(bulkSize, 1.0 / bulkSize);
         return Math.max(0.0, v);
     }
+
 }

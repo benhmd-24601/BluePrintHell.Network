@@ -13,7 +13,7 @@ public class StageFactory {
         List<NetworkSystem> systems = new ArrayList<>();
         systems.add(new SourceSystem(100, 400, 8, 5));
         systems.add(new NetworkSystem(350, 250, 3));
-        systems.add(new NetworkSystem(600, 300, 1));
+        systems.add(new NetworkSystem(600, 300, 3));
         systems.add(new SinkSystem(800, 400, 8));
         return new Stage(systems, 10000, 120, 50.0);
     }
@@ -28,4 +28,5 @@ public class StageFactory {
         systems.add(new SinkSystem(850, 250, 8));
         return new Stage(systems, 2000, 150, 50.0);
     }
+
 }
