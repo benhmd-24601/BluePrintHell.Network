@@ -129,6 +129,20 @@ public class MouseHandler extends MouseAdapter {
             startPort = clickedPort;
             return;
         }
+        for (NetworkSystem s : env.getSystems()) {
+            if (toggleRectFor(s).contains(e.getPoint())) {
+                boolean nowEnabled = !s.isEnabled();
+                s.setEnabled(nowEnabled);
+                // اگر setter تایمر داری:
+                try {
+                    s.getClass().getMethod("setReenableTimerSec", double.class)
+                            .invoke(s, nowEnabled ? 0.0 : 5.0);
+                } catch (Exception ignore) { /* اگر نداری، نادیده بگیر */ }
+
+                repaintCallback.run();
+                return; // مصرف رویداد
+            }
+        }
 
         // --- در غیر این‌صورت: شروع درگِ سیستم
         NetworkSystem sys = findSystemAt(e.getPoint());
@@ -141,6 +155,15 @@ public class MouseHandler extends MouseAdapter {
 
         // otherwise: هیچ کاری لازم نیست
     }
+
+    private Rectangle toggleRectFor(NetworkSystem s) {
+        int boxW = 120, indR = 12, indM = 5;
+        int size = 14, gapY = 4, shiftX = 4;
+        int x = (int) s.getX() + boxW - size - indM - shiftX;
+        int y = (int) s.getY() + indM + indR + gapY;
+        return new Rectangle(x, y, size, size);
+    }
+
 
     @Override
     public void mouseReleased(MouseEvent e) {

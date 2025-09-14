@@ -157,5 +157,15 @@ public abstract class Packet {
     public String getPortKey() {
         return null; // پیش‌فرض: پکتی که پورت‌محور نیست
     }
+    private boolean teleported = false;          // ← NEW
 
+    public boolean isTeleported() {              // ← NEW
+        return teleported;
+    }
+    public void setTeleported(boolean t) {       // ← NEW
+        this.teleported = t;
+    }
+    public void markTeleported() {               // ← NEW
+        this.teleported = true;
+    }
 }

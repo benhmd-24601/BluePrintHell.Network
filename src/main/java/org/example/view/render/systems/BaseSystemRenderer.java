@@ -19,19 +19,21 @@ import java.util.List;
 public class BaseSystemRenderer<T extends NetworkSystem> implements SystemRenderer<T> {
     protected final RendererRegistry registry;
 
-    public BaseSystemRenderer(RendererRegistry registry) { this.registry = registry; }
+    public BaseSystemRenderer(RendererRegistry registry) {
+        this.registry = registry;
+    }
 
     @Override
     public void paint(T system, Graphics2D g2, RenderContext ctx) {
         drawBox(g2, system);
         drawPorts(g2, system);
-       drawBulbLampTopLeft(g2, system);
+        drawBulbLampTopLeft(g2, system);
 
         drawIndicator(g2, system);
         drawStorageBadge(g2, system);
         drawCooldownTimer(g2, system);
         drawStorage(g2, system);
-//        paintStorage(g2,system);
+        drawToggleSwitchTopRight(g2, system);
     }
 
     // BaseSystemRenderer.java
@@ -56,12 +58,12 @@ public class BaseSystemRenderer<T extends NetworkSystem> implements SystemRender
             int h = fm.getAscent() + fm.getDescent() + padY * 2;
 
             // رنگ‌های روشن/خاموش
-            Color bgOn     = new Color(  5,  15,   5);
-            Color frameOn  = new Color(  0, 120,   0);
-            Color textOn   = new Color(100, 255, 100);
+            Color bgOn = new Color(5, 15, 5);
+            Color frameOn = new Color(0, 120, 0);
+            Color textOn = new Color(100, 255, 100);
 
-            Color bgOff    = new Color( 12,  12,  12);
-            Color frameOff = new Color( 40,  40,  40);
+            Color bgOff = new Color(12, 12, 12);
+            Color frameOff = new Color(40, 40, 40);
             // متن خاموش: نمایش نمی‌دهیم تا حس «خاموش» بدهد
 
             // زمینه و قاب
@@ -145,7 +147,7 @@ public class BaseSystemRenderer<T extends NetworkSystem> implements SystemRender
                     new Color[]{
                             new Color(255, 236, 180, 230),
                             new Color(255, 210, 110, 110),
-                            new Color(255, 210, 110,   0)
+                            new Color(255, 210, 110, 0)
                     }
             );
             g2.setPaint(rgp);
@@ -180,8 +182,44 @@ public class BaseSystemRenderer<T extends NetworkSystem> implements SystemRender
         g2.setComposite(oldCp);
     }
 
+    private static final int BOX_W = 120;
+    private static final int INDICATOR_R = 12;
+    private static final int INDICATOR_MARGIN = 5;
 
-    /** لامپ وضعیت فعال/غیرفعال سیستم در گوشه‌ی بالا-چپ */
+    private static final int TOGGLE_SIZE = 14;
+    private static final int TOGGLE_GAP_Y = 4;   // فاصله از زیرِ اندیکاتور
+    private static final int TOGGLE_SHIFT_X = 4; // کمی چپ‌تر از لبه راست
+
+    protected void drawToggleSwitchTopRight(Graphics2D g2, NetworkSystem s) {
+        int x = (int) s.getX() + BOX_W - TOGGLE_SIZE - INDICATOR_MARGIN - TOGGLE_SHIFT_X;
+        int y = (int) s.getY() + INDICATOR_MARGIN + INDICATOR_R + TOGGLE_GAP_Y;
+
+        boolean enabled = s.isEnabled();
+
+        // پس‌زمینه + قاب
+        g2.setColor(enabled ? new Color(70, 70, 70) : new Color(150, 35, 35));
+        g2.fillRect(x, y, TOGGLE_SIZE, TOGGLE_SIZE);
+        g2.setColor(Color.WHITE);
+        g2.drawRect(x, y, TOGGLE_SIZE, TOGGLE_SIZE);
+
+        // آیکن داخل: روشن=نماد پاور، خاموش=X
+        if (enabled) {
+            g2.setColor(Color.WHITE);
+            int cx = x + TOGGLE_SIZE / 2, cy = y + TOGGLE_SIZE / 2;
+            int r = TOGGLE_SIZE / 2 - 3;
+            g2.drawOval(cx - r, cy - r, 2 * r, 2 * r);
+            g2.drawLine(cx, cy - r + 2, cx, cy + r - 2);
+        } else {
+            g2.setColor(Color.WHITE);
+            g2.drawLine(x + 3, y + 3, x + TOGGLE_SIZE - 3, y + TOGGLE_SIZE - 3);
+            g2.drawLine(x + TOGGLE_SIZE - 3, y + 3, x + 3, y + TOGGLE_SIZE - 3);
+        }
+    }
+
+
+    /**
+     * لامپ وضعیت فعال/غیرفعال سیستم در گوشه‌ی بالا-چپ
+     */
     protected void drawEnabledLamp(Graphics2D g2, NetworkSystem s) {
         int r = 12;
         int x = (int) s.getX() + 5;
@@ -203,7 +241,9 @@ public class BaseSystemRenderer<T extends NetworkSystem> implements SystemRender
         g2.drawOval(x, y, r, r);
     }
 
-    /** نشان دادن تعداد پکت‌های انبار (یا received در Sink) به صورت badge بالای سیستم */
+    /**
+     * نشان دادن تعداد پکت‌های انبار (یا received در Sink) به صورت badge بالای سیستم
+     */
     protected void drawStorageBadge(Graphics2D g2, NetworkSystem s) {
         // 1) تعداد را بگیر
         int count = (s instanceof SinkSystem sink)
@@ -226,7 +266,7 @@ public class BaseSystemRenderer<T extends NetworkSystem> implements SystemRender
         int boxX = (int) s.getX();
         int boxY = (int) s.getY();
         int boxW = 120; // همان عرضی که در drawBox استفاده می‌کنیم
-        int x =( boxX + (boxW - w) / 2 ) + 10;
+        int x = (boxX + (boxW - w) / 2) + 10;
         int y = boxY - h - 6; // کمی بالاتر از جعبه
 
         // اگر خیلی بالا رفت (مثلاً سیستم نزدیک لبه‌ی بالا بود) کمی پایین‌ترش بیار
@@ -259,14 +299,14 @@ public class BaseSystemRenderer<T extends NetworkSystem> implements SystemRender
             if ("square".equals(p.getType())) {
                 g2.setColor(Color.GREEN);
                 g2.fillRect(px, py, port, port);
-            } else if ("triangle".equals(p.getType())){
+            } else if ("triangle".equals(p.getType())) {
                 g2.setColor(Color.YELLOW);
                 Polygon tri = new Polygon();
-                tri.addPoint(px, py + port/2);
+                tri.addPoint(px, py + port / 2);
                 tri.addPoint(px + port, py);
                 tri.addPoint(px + port, py + port);
                 g2.fillPolygon(tri);
-            }else {
+            } else {
                 g2.setColor(Color.BLACK);
                 g2.fillOval(px, py, port, port);
             }
@@ -277,14 +317,14 @@ public class BaseSystemRenderer<T extends NetworkSystem> implements SystemRender
             if ("square".equals(p.getType())) {
                 g2.setColor(Color.GREEN);
                 g2.fillRect(px, py, port, port);
-            } else if ("triangle".equals(p.getType())){
+            } else if ("triangle".equals(p.getType())) {
                 g2.setColor(Color.YELLOW);
                 Polygon tri = new Polygon();
-                tri.addPoint(px + port, py + port/2);
+                tri.addPoint(px + port, py + port / 2);
                 tri.addPoint(px, py);
                 tri.addPoint(px, py + port);
                 g2.fillPolygon(tri);
-            }else {
+            } else {
                 g2.setColor(Color.black);
                 g2.fillOval(px, py, port, port);
             }
@@ -323,8 +363,8 @@ public class BaseSystemRenderer<T extends NetworkSystem> implements SystemRender
         // عنوان
         g2.setColor(Color.BLACK);
         g2.setFont(new Font("Consolas", Font.BOLD, 10));
-        String title = "Storage" ;
-        g2.drawString(title, startX- 8, startY - 25 );
+        String title = "Storage";
+        g2.drawString(title, startX - 8, startY - 25);
 
         // آیکون‌ها
         for (int i = 0; i < packets.size(); i++) {
@@ -336,7 +376,10 @@ public class BaseSystemRenderer<T extends NetworkSystem> implements SystemRender
         }
 
     }
-    /** نمایش محتوای استوریج (یا received در Sink) به صورت آیکون‌های کوچک */
+
+    /**
+     * نمایش محتوای استوریج (یا received در Sink) به صورت آیکون‌های کوچک
+     */
     protected void paintStorage(Graphics2D g, NetworkSystem sys) {
 
     }
