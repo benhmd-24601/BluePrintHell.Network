@@ -11,9 +11,9 @@ public class SinkSystemRenderer extends BaseSystemRenderer<SinkSystem> {
     @Override
     public void paint(SinkSystem s, Graphics2D g2, RenderContext ctx) {
         super.paint(s, g2, ctx);
-        g2.setColor(Color.WHITE);
+        g2.setColor(Color.BLACK);
         g2.setFont(new Font("Consolas", Font.BOLD, 14));
-        g2.drawString("SINK", (int)s.getX() + 45, (int)s.getY() + 22);
+        g2.drawString("SINK", (int)s.getX() + 60, (int)s.getY() + 18);
        // paintStorage(g2 ,s);
     }
 }

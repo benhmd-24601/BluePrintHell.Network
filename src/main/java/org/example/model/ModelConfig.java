@@ -46,4 +46,8 @@ public final class ModelConfig {
     public static final int COIN_SECRET2  = 4;
     public static final int COIN_HEAVY8   = 8;
     public static final int COIN_HEAVY10  = 10;
+
+    public static final double SYS_DISABLE_SPEED_THRESH = 5.0;
+    public static final double SYS_AUTO_REENABLE_SEC    = 5.0;
+
 }

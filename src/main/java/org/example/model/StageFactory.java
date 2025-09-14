@@ -17,7 +17,7 @@ public class StageFactory {
         systems.add(new VPNSystem(350, 250));
         systems.add(new NetworkSystem(600, 300, 1));
         systems.add(new SinkSystem(800, 400, 8));
-        return new Stage(systems, 500, 120, 50.0);
+        return new Stage(systems, 10000, 120, 50.0);
     }
 
     public static Stage createStage2() {

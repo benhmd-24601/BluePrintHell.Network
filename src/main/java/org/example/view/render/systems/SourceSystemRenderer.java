@@ -11,8 +11,8 @@ public class SourceSystemRenderer extends BaseSystemRenderer<SourceSystem> {
     @Override
     public void paint(SourceSystem s, Graphics2D g2, RenderContext ctx) {
         super.paint(s, g2, ctx);
-        g2.setColor(Color.WHITE);
+        g2.setColor(Color.BLACK);
         g2.setFont(new Font("Consolas", Font.BOLD, 14));
-        g2.drawString("SOURCE", (int)s.getX() + 28, (int)s.getY() + 22);
+        g2.drawString("SOURCE", (int)s.getX() + 60, (int)s.getY() + 18);
     }
 }

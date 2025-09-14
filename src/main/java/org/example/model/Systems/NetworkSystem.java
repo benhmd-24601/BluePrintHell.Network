@@ -28,13 +28,16 @@ public class NetworkSystem {
 
     public NetworkSystem(double x, double y, int type) {
         this.type = type;
-        double spacing = 120 / 3.0;
+        double spacing = 120 / 4.0;
 
         if (type == 1) {
             inputPorts.add(new Port("square", -1, this, x - 15, y + spacing, true));
             inputPorts.add(new Port("triangle", -1, this, x - 15, y + 2 * spacing, true));
+            inputPorts.add(new Port("circle" , -1 , this , x - 15 , y + 3 * spacing  ,true));
             outputPorts.add(new Port("square", 1, this, x + 120, y + spacing, true));
             outputPorts.add(new Port("triangle", 1, this, x + 120, y + 2 * spacing, true));
+            outputPorts.add(new Port("circle" , 1 , this , x  +120 , y + 3 * spacing  ,true));
+
 
 
         } else if (type == 2) {
@@ -47,8 +50,10 @@ public class NetworkSystem {
         } else if (type == 3) {
             inputPorts.add(new Port("square", -1, this, x - 15, y + spacing, true));
             inputPorts.add(new Port("triangle", -1, this, x - 15, y + 2 * spacing, true));
+            inputPorts.add(new Port("circle" , -1 , this , x - 15 , y + 3 * spacing  ,true));
             outputPorts.add(new Port("square", 1, this, x + 120, y + spacing, true));
             outputPorts.add(new Port("triangle", 1, this, x + 120, y + 2 * spacing, true));
+            outputPorts.add(new Port("circle" , 1 , this , x  +120 , y + 3 * spacing  ,true));
 //            inputPorts.add(new Port("triangle", -1, this, x - 15, y + 2 * spacing - 20, true));
 //            outputPorts.add(new Port("triangle", 1, this, x + 120, y + 2 * spacing, true));
         } else if (type == 4) {
@@ -71,6 +76,7 @@ public class NetworkSystem {
 
         outputWires.put("square", new ArrayList<>());
         outputWires.put("triangle", new ArrayList<>());
+        outputWires.put("circle", new ArrayList<>());
     }
 
     public void setEnv(GameEnv env) {
@@ -182,8 +188,7 @@ public class NetworkSystem {
         return packetStorage.size();
     }
 
-    public void update() {
-    }
+
 
     public boolean isSourceSystem() {
         return isSourceSystem;
@@ -218,4 +223,27 @@ public class NetworkSystem {
 
     public void setX(double x) { this.x = x; }
     public void setY(double y) { this.y = y; }
+
+
+
+    private double reenableTimerSec = 0;
+
+    public void disableFor(double sec) {
+        setEnabled(false);
+        reenableTimerSec = Math.max(reenableTimerSec, sec);
+    }
+
+    public void update() {
+        // با فرض ~60fps (مثل AntiTrojan)
+        if (!isEnabled() && reenableTimerSec > 0) {
+            reenableTimerSec -= 1.0 / 60.0;
+            if (reenableTimerSec <= 0) {
+                setEnabled(true);
+                reenableTimerSec = 0;
+            }
+        }
+    }
+    public double getReenableTimerSec() {
+        return Math.max(0, reenableTimerSec);
+    }
 }

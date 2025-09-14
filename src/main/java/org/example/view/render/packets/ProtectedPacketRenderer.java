@@ -18,6 +18,12 @@ public class ProtectedPacketRenderer implements PacketRenderer<ProtectedPacket> 
         g2.setColor(mismatch ? new Color(255,165,0) : Color.WHITE);
         g2.fillOval(x, y, s, s);
 
+        int cx = x + s/2;
+        int cy = y + s/2;
+        int dot = Math.max(3, (int) Math.round(4 * scale));
+        g2.setColor(p.isProtectionActive() ? new Color(0, 200, 0) : Color.BLACK);
+        g2.fillOval(cx - dot/2, cy - dot/2, dot, dot);
+
         // <-- اضافه: نمایش ID بالای پکت
         g2.setColor(Color.WHITE);
         g2.setFont(new Font("Consolas", Font.PLAIN, Math.max(8, (int)(10*scale))));

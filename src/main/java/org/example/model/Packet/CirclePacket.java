@@ -39,4 +39,6 @@ public class CirclePacket extends Packet {
 
     @Override public int getSize() { return 1; }
     @Override public int getCoinValue() { return COIN_CIRCLE; }
+    @Override public String getPortKey() { return "circle"; }
+
 }

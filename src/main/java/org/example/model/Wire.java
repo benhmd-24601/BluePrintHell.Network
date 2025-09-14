@@ -104,7 +104,11 @@ public class Wire {
 
         if (currentPacket == null) return;
         Packet p = currentPacket;
-
+        double v = p.getInstantSpeed();
+        if (v > ModelConfig.SYS_DISABLE_SPEED_THRESH) {
+            endSystem.disableFor(5.0);
+            org.example.util.Debug.log("[SYS]", "disabled by overspeed v=" + org.example.util.Debug.fmt(v));
+        }
         boolean forward = p.isGoingForward();
         if (forward) {
             if (!endSystem.isEnabled()) {

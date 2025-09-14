@@ -130,6 +130,12 @@ public class GameEnv {
         }
         lastPowerUpdateTime = currentTime;
 
+
+        for (NetworkSystem s : systems) {
+            s.update();
+        }
+
+
         // تولید مثل قبل (خود سورس با isGenerating کنترل می‌کند)
         generate(delta);
 
