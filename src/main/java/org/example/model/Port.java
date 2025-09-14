@@ -74,4 +74,10 @@ public class Port {
     public double getCenterY() { return y + getVisualSize() / 2.0; }
     public int getVisualSize() { return 15; }
     public void setType(String t) { this.type = t; }
+
+
+        public void setPosition(double x, double y){ this.x = x; this.y = y; }
+        public void translate(double dx, double dy){ this.x += dx; this.y += dy; }
+
+
 }

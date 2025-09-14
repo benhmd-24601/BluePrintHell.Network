@@ -3,6 +3,7 @@ package org.example.model;
 import org.example.model.Packet.HeavyPacket;
 import org.example.model.Packet.Packet;
 import org.example.model.Systems.NetworkSystem;
+import org.example.util.Debug;
 
 import java.awt.*;
 import java.util.List;
@@ -67,11 +68,23 @@ public class Wire {
             if (!endSystem.isEnabled()) return;
 
             Packet packet = startSystem.getNextPacketForWire(startPortType, startSystem.getAllConnectedWires());
-            if (packet != null && packet.canEnterWireWithStartType(startPortType)) {
+            if (packet != null) {
                 currentPacket = packet;
                 packet.setDirectionForward();
                 packet.setWire(this);
                 env.getPackets().add(currentPacket);
+
+                Debug.log("[WIRE]", "place " + Debug.p(packet) + " on " + Debug.wire(this) +
+                        " compat=" + (packet.getCompatibilityKey()==null? "*" : packet.getCompatibilityKey()) +
+                        "/" + startPortType);
+
+                if (packet.getCompatibilityKey() != null &&
+                        !packet.getCompatibilityKey().equals(startPortType)) {
+                    // همین‌جا بعد از کاهش سرعت، لاگ کن
+                    Debug.log("[WIRE]", "mismatch slow " + Debug.p(packet) +
+                            " v=" + Debug.fmt(packet.getInstantSpeed()));
+                }
+
 
                 // اگر ناسازگار بود (برای پیام‌رسان‌ها معنی دارد)، سرعتش را 0.7 کن (منطق قدیمی شما)
                 if (packet.getCompatibilityKey() != null &&
@@ -88,59 +101,114 @@ public class Wire {
     }
 
     public void deliverCurrentPacket() {
+
         if (currentPacket == null) return;
         Packet p = currentPacket;
 
         boolean forward = p.isGoingForward();
-
         if (forward) {
-            // اگر مقصد در لحظه‌ی رسیدن غیرفعال شد → برگشت
             if (!endSystem.isEnabled()) {
+                Debug.log("[WIRE]", "bounce " + Debug.p(p) + " at disabled " + Debug.sys(endSystem));
                 p.bounceBackFromEnd();
                 return;
             }
 
-            // عبور «حجیم» را بشمار، شاید سیم نابود شود
             if (p instanceof HeavyPacket) {
                 heavyPasses++;
+                Debug.log("[WIRE]", "heavy pass " + Debug.p(p) + " count=" + heavyPasses);
             }
 
-            // پکت تحویل مقصد
+            Debug.log("[DELIVER]", Debug.p(p) + " → " + Debug.sys(endSystem));
             p.onDelivered(env, endSystem);
 
-            // «اگر» پیام‌رسان از پورت ناسازگار وارد این سیستم شده بود → سرعت خروج بعدی ×2
-            if (p.getCompatibilityKey() != null &&
-                    !Objects.equals(p.getCompatibilityKey(), this.startPortType)) {
-                p.setSpeed(p.getInstantSpeed() * 2.0);
+            boolean mism = (p.getCompatibilityKey()!=null &&
+                    !Objects.equals(p.getCompatibilityKey(), this.startPortType));
+            if (mism) {
+                Debug.log("[WIRE]", "post-deliver boost " + Debug.p(p) +
+                        " v=" + Debug.fmt(p.getInstantSpeed()));
             }
 
             endSystem.addPacket(p);
             startSystem.removePacket(p);
             currentPacket = null;
 
-            // نابودی سیم بعد از 3 عبور حجیم
             if (heavyPasses >= ModelConfig.HEAVY_WIRE_MAX_PASSES) {
+                Debug.log("[WIRE]", "destroy " + Debug.wire(this) + " (heavy passes=" + heavyPasses + ")");
                 env.removeWire(this);
             }
 
-            // اگر پکت حجیم بود: پورت ورودیِ سیستم مقصد را تصادفی تغییر بده
             if (p instanceof HeavyPacket && endPort != null) {
                 endPort.setType(new Random().nextBoolean() ? "square" : "triangle");
+
+                Debug.log("[WIRE]", "heavy flipped end-port of " + Debug.sys(endSystem) +
+                        " to " + endPort.getType());
             }
 
         } else {
-            // رسیدن به مبدا در حالت برگشت
             if (!startSystem.isEnabled()) {
                 p.setDirectionForward();
                 return;
             }
+            Debug.log("[DELIVER]", Debug.p(p) + " → " + Debug.sys(startSystem) + " (back)");
             p.onDelivered(env, startSystem);
             startSystem.addPacket(p);
             endSystem.removePacket(p);
             currentPacket = null;
-
-            // اگر حجیم بود و از این سر رد شد، شمارش عبور را هم به‌دلخواه می‌توانید اضافه کنید
         }
+
+//        if (currentPacket == null) return;
+//        Packet p = currentPacket;
+//
+//        boolean forward = p.isGoingForward();
+//
+//        if (forward) {
+//            // اگر مقصد در لحظه‌ی رسیدن غیرفعال شد → برگشت
+//            if (!endSystem.isEnabled()) {
+//                p.bounceBackFromEnd();
+//                return;
+//            }
+//
+//            // عبور «حجیم» را بشمار، شاید سیم نابود شود
+//            if (p instanceof HeavyPacket) {
+//                heavyPasses++;
+//            }
+//
+//            // پکت تحویل مقصد
+//            p.onDelivered(env, endSystem);
+//
+//            // «اگر» پیام‌رسان از پورت ناسازگار وارد این سیستم شده بود → سرعت خروج بعدی ×2
+//            if (p.getCompatibilityKey() != null &&
+//                    !Objects.equals(p.getCompatibilityKey(), this.startPortType)) {
+//                p.setSpeed(p.getInstantSpeed() * 2.0);
+//            }
+//
+//            endSystem.addPacket(p);
+//            startSystem.removePacket(p);
+//            currentPacket = null;
+//
+//            // نابودی سیم بعد از 3 عبور حجیم
+//            if (heavyPasses >= ModelConfig.HEAVY_WIRE_MAX_PASSES) {
+//                env.removeWire(this);
+//            }
+//
+//            // اگر پکت حجیم بود: پورت ورودیِ سیستم مقصد را تصادفی تغییر بده
+//            if (p instanceof HeavyPacket && endPort != null) {
+//                endPort.setType(new Random().nextBoolean() ? "square" : "triangle");
+//            }
+//
+//        } else {
+//            // رسیدن به مبدا در حالت برگشت
+//            if (!startSystem.isEnabled()) {
+//                p.setDirectionForward();
+//                return;
+//            }
+//            p.onDelivered(env, startSystem);
+//            startSystem.addPacket(p);
+//            endSystem.removePacket(p);
+//            currentPacket = null;
+//
+//            // اگر حجیم بود و از این سر رد شد، شمارش عبور را هم به‌دلخواه می‌توانید اضافه کنید
+//        }
     }
 
     public boolean isBusy() { return currentPacket != null; }
@@ -149,11 +217,6 @@ public class Wire {
     public NetworkSystem getStartSystem() { return startSystem; }
     public NetworkSystem getEndSystem() { return endSystem; }
 
-    public double getLength() { return length; }
-    public double getEndX() { return Ex; }
-    public double getEndY() { return Ey; }
-    public double getStartx() { return Sx; }
-    public double getStarty() { return Sy; }
 
     public String getStartPortType() { return startPortType; }
     public String getEndPortType() { return endPortType; }
@@ -175,19 +238,15 @@ public class Wire {
         this.heavyPasses = heavyPasses;
     }
 
-    public double getEy() {
-        return Ey;
-    }
+    public double getStartx() { return (startPort != null) ? startPort.getCenterX() : Sx; }
+    public double getStarty() { return (startPort != null) ? startPort.getCenterY() : Sy; }
+    public double getEndX()   { return (endPort   != null) ? endPort.getCenterX()   : Ex; }
+    public double getEndY()   { return (endPort   != null) ? endPort.getCenterY()   : Ey; }
 
-    public double getEx() {
-        return Ex;
-    }
-
-    public double getSy() {
-        return Sy;
-    }
-
-    public double getSx() {
-        return Sx;
+    /** طول لحظه‌ای سیم از روی مختصات فعلی پورت‌ها */
+    public double getLength() {
+        double dx = getEndX() - getStartx();
+        double dy = getEndY() - getStarty();
+        return Math.hypot(dx, dy);
     }
 }

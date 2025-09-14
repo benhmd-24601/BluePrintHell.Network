@@ -2,11 +2,14 @@ package org.example.util;
 
 import org.example.model.*;
 import org.example.model.Systems.NetworkSystem;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
+import org.example.model.Packet.Packet;
+import org.example.model.Systems.NetworkSystem;
+import org.example.model.Wire;
 public final class Debug {
+
+
     private Debug() {}
     /** روشن/خاموش کردن لاگ‌ها */
     public static volatile boolean ENABLED = true;
@@ -48,4 +51,21 @@ public final class Debug {
             }
         }
     }
+
+
+    public static String p(Packet p) {
+        if (p == null) return "null";
+        return p.getClass().getSimpleName() + "#" + p.getId();
+    }
+    public static String sys(NetworkSystem s) {
+        if (s == null) return "null";
+        return s.getClass().getSimpleName() + "@(" + (int)s.getX() + "," + (int)s.getY() + ")";
+    }
+    public static String wire(Wire w) {
+        if (w == null) return "null";
+        return "Wire[" + sys(w.getStartSystem()) + " " + w.getStartPortType() +
+                " → " + sys(w.getEndSystem())   + " " + w.getEndPortType() + "]";
+    }
+    public static String fmt(double v) { return String.format("%.2f", v); }
+
 }

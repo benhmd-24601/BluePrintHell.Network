@@ -13,19 +13,23 @@ public class ProtectedPacket extends Packet {
     private final Mode mode;
     private boolean protectionActive = true;
     private VPNSystem provider;       // برای dropProtection وقتی VPN خاموش شود
-
+    private final int originalId;
     public ProtectedPacket(Packet original, VPNSystem provider) {
         super(original.getX(), original.getY());
 
         this.original = original;
         this.provider = provider;
+        this.originalId = original.getId();
         // حرکت تصادفی مثل یکی از پیام‌رسان‌ها
         int r = ThreadLocalRandom.current().nextInt(3);
         this.mode = (r==0? Mode.SQUARE_LIKE : r==1? Mode.TRIANGLE_LIKE : Mode.CIRCLE_LIKE);
         // سرعت پایه
         setSpeed(BASE_SPEED_MSG);
     }
-
+    @Override
+    public int getId() {                 // <-- همیشه ID اصلی را برگردان
+        return originalId;
+    }
     public void dropProtection() { protectionActive = false; }
 
     public Packet getOriginal() { return original; }

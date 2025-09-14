@@ -7,6 +7,7 @@ import org.example.model.Packet.SquarePacket;
 import org.example.model.Packet.TrianglePacket;
 import org.example.model.Port;
 import org.example.model.Wire;
+import org.example.util.Debug;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -63,6 +64,9 @@ public class SourceSystem extends NetworkSystem {
             if (suitableWire != null && (suitableWire.getEndSystem() == null || suitableWire.getEndSystem().isEnabled())) {
                 // پیشنهاد: برای اطمینان از فعال‌بودن مقصد همین‌جا هم چک شود
                 suitableWire.setCurrentPacket(packet);  // setWire → onEnterWireConfigure + بوست
+
+                Debug.log("[WIRE]", "source put " + Debug.p(packet) + " on " + Debug.wire(suitableWire));
+
                 generated.add(packet);
                 packetCount--;
             } else {

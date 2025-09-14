@@ -122,7 +122,7 @@ public abstract class Packet {
         lastUpdateNs = now;
 
         if (timeOnThisWireSec > PACKET_WIRE_TIMEOUT) {
-            wire.getEnv().markAsLost(this);
+            wire.getEnv().markAsLost(this , "timeout_on_wire>" + PACKET_WIRE_TIMEOUT + "s");
             if (wire.getCurrentPacket() == this) wire.setCurrentPacket(null);
             return;
         }

@@ -4,6 +4,7 @@ import org.example.model.GameEnv;
 import org.example.model.Packet.BitPacket;
 import org.example.model.Packet.Packet;
 import org.example.model.Wire;
+import org.example.util.Debug;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +30,11 @@ public class SinkSystem extends NetworkSystem {
             // طبق خواسته‌ی تو: رسیدن «بیت‌پکت» به سینک → یک جریمه‌ی ویژه
             // فرمول ارائه‌شده: N - N * N^(1/N)  (توجه: این مقدار منفی می‌شود)
             double loss = lossFromBitArrival(bp.getBulkSize());
+
+            Debug.log("[SINK]", "bit-arrival " + Debug.p(packet) +
+                    " grp=" + bp.getGroupId() + " N=" + bp.getBulkSize() +
+                    " loss+=" + Debug.fmt(loss));
+
             env.increasePacketLoss(loss);
             return; // بیت‌ها در سینک ذخیره نمی‌شوند
         }

@@ -4,6 +4,7 @@ import org.example.model.Packet.Packet;
 import org.example.model.Systems.NetworkSystem;
 import org.example.model.Systems.SinkSystem;
 import org.example.model.Systems.SourceSystem;
+import org.example.util.Debug;
 
 import javax.swing.*;
 import java.util.*;
@@ -198,6 +199,11 @@ public class GameEnv {
             }
         }
         for (Packet p : newPackets) p.setId(nextPacketId++);
+
+        for (Packet p : newPackets) {
+            Debug.log("[GEN]", "created " + Debug.p(p) + " @(" + (int)p.getX() + "," + (int)p.getY() + ")");
+        }
+
         packets.addAll(newPackets);
     }
 
@@ -266,7 +272,8 @@ public class GameEnv {
                 if (p.isCompletelyOffWire()) toRemove.add(p);
             }
         }
-        for (Packet p : toRemove) markAsLost(p);
+        for (Packet p : toRemove) markAsLost(p, "off_wire_impact");
+
     }
 
     public void markAsLost(Packet p) {
@@ -280,6 +287,13 @@ public class GameEnv {
             if (onGameOver != null) SwingUtilities.invokeLater(onGameOver);
         }
     }
+    public void markAsLost(Packet p, String reason) {
+        if (p == null) return;
+        Debug.log("[LOSS]", Debug.p(p) + (reason==null? "" : " reason=" + reason) +
+                " wire=" + (p.getWire()==null? "-" : Debug.wire(p.getWire())));
+        markAsLost(p); // متد اصلی موجود
+    }
+
     // endregion
 
     public void addWire(Wire wire) { wires.add(wire); }
@@ -344,5 +358,36 @@ public class GameEnv {
     public void setMovementPaused(boolean paused) { this.movementPaused = paused; }
     public void pauseMovement() { movementPaused = true; }
     public void resumeMovement() { movementPaused = false; }
+
+    private boolean overBudget = false;
+
+    public boolean isOverBudget() { return overBudget; }
+
+    /** طولِ مصرف‌شده = مجموع طول تمام سیم‌ها از روی موقعیت فعلی پورت‌ها */
+    public double getUsedWireLength() { return initialWireLength - remainingWireLength; }
+
+    /** وقتی سیمی اضافه/حذف/طولش عوض شد (مثلاً با جابجایی سیستم‌ها) این را صدا بزن */
+    public void recalcWireBudget() {
+        double used = 0.0;
+        for (Wire w : wires) used += w.getLength();
+        remainingWireLength = initialWireLength - used;  // ممکن است منفی شود (over)
+        overBudget = (remainingWireLength < 0);
+    }
+
+    /** جابجایی یک سیستم (مدل: هم خود سیستم هم تمام پورت‌هایش جابجا شوند) */
+    public void moveSystem(NetworkSystem sys, double newX, double newY) {
+        double dx = newX - sys.getX();
+        double dy = newY - sys.getY();
+        sys.setX(newX);
+        sys.setY(newY);
+        // شیفت دادن مختصات پورت‌ها
+        for (Port p : sys.getInputPorts())  p.translate(dx, dy);
+        for (Port p : sys.getOutputPorts()) p.translate(dx, dy);
+        // حالا طول‌ سیم‌ها از روی پورت‌ها تغییر می‌کند → بودجه را مجدداً حساب کن
+        recalcWireBudget();
+    }
+
+
+
 
 }

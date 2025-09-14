@@ -114,27 +114,28 @@ public class GameController {
     }
 
     private void handleSourceButtonClick(SourceSystem source, JButton button) {
-        // 1) آیا همه‌ی سیستم‌ها متصل‌اند؟ (همون منطق قبلی خودت)
+        // 1) همه سیستم‌ها وصل‌اند؟
         boolean allConnected = true;
         for (NetworkSystem system : env.getSystems()) {
-            if (!system.isSourceSystem() && !system.isIndicatorOn()) {
-                allConnected = false;
-                break;
-            }
+            if (!system.isSourceSystem() && !system.isIndicatorOn()) { allConnected = false; break; }
         }
         if (!allConnected) return;
 
-        // 2) Play ⇄ Pause
-        boolean nextRunning = !source.isGenerating(); // مثل قبل تولید سورس را هم toggle کنیم
+        // ✦ جدید: اگر سیم کم است، اجازه Start نده
+        if (env.isOverBudget()) {
+            JOptionPane.showMessageDialog(
+                    gameView,
+                    "مصرف سیم از موجودی بیشتر است.\nلطفاً سیستم‌ها را نزدیک‌تر کنید یا طول مسیر را کم کنید.",
+                    "Wire Over Budget", JOptionPane.WARNING_MESSAGE
+            );
+            return;
+        }
+
+        boolean nextRunning = !source.isGenerating();
         source.setGenerating(nextRunning);
-
-        // ✦ نکته اصلی: حرکت سراسری را هم با همان دکمه pause/resume کنیم
         env.setMovementPaused(!nextRunning);
-
-        // 3) UI
-        button.setText(nextRunning ? "❚❚" : "◀"); // در حال اجرا = pause icon، در حال توقف = play icon
+        button.setText(nextRunning ? "❚❚" : "◀");
     }
-
 
     private void createPowerButtons() {
         // ساخت پنل نوار قدرت

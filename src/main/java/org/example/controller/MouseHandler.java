@@ -20,7 +20,17 @@ public class MouseHandler extends MouseAdapter {
     // برای گزارش hover فقط وقتی تغییر می‌کند
     private Port lastHoverPort = null;
 
+    private NetworkSystem draggingSystem = null;
+    private int dragOffsetX = 0, dragOffsetY = 0;
 
+    private NetworkSystem findSystemAt(Point p) {
+        // Hit-test مستطیل بدنهٔ سیستم مطابق رندر: 120×160
+        for (NetworkSystem s : env.getSystems()) {
+            int x = (int) s.getX(), y = (int) s.getY();
+            if (new Rectangle(x, y, 120, 160).contains(p)) return s;
+        }
+        return null;
+    }
 
     public MouseHandler(GameEnv env, Runnable repaintCallback) {
         this.env = env;
@@ -28,11 +38,10 @@ public class MouseHandler extends MouseAdapter {
     }
 
 
-
     private String portDesc(Port p) {
         String side = p.getSide() == 1 ? "OUT" : "IN";
-        return side + " " + p.getType() + " port@(" + (int)p.getX() + "," + (int)p.getY() +
-                ") of sys@(" + (int)p.getSystem().getX() + "," + (int)p.getSystem().getY() + ")";
+        return side + " " + p.getType() + " port@(" + (int) p.getX() + "," + (int) p.getY() +
+                ") of sys@(" + (int) p.getSystem().getX() + "," + (int) p.getSystem().getY() + ")";
     }
 
     @Override
@@ -58,25 +67,30 @@ public class MouseHandler extends MouseAdapter {
         repaintCallback.run();
     }
 
+
     @Override
     public void mouseDragged(MouseEvent e) {
         currentMouse = e.getPoint();
 
-        // 2) مختصات لحظه‌ای موس در درگ (با throttle)
+        // اگر در حال درگ سیستم هستیم
+        if (draggingSystem != null) {
+            int nx = e.getX() - dragOffsetX;
+            int ny = e.getY() - dragOffsetY;
+            env.moveSystem(draggingSystem, nx, ny); // پورت‌ها و بودجه سیم به‌روز می‌شوند
+            repaintCallback.run();
+            return;
+        }
+
+        // در غیر این صورت: اگر در حال کشیدن سیم هستیم
         if (Debug.throttle("mouseDrag", 30)) {
             Debug.log("[MOUSE]", "drag (" + e.getX() + "," + e.getY() + ")");
         }
-
-        if (startPort != null) {
-            repaintCallback.run();
-        }
+        if (startPort != null) repaintCallback.run();
     }
+
 
     @Override
     public void mousePressed(MouseEvent e) {
-
-
-
         Port clickedPort = findPortAt(e.getPoint());
         if (clickedPort != null) {
             Debug.log("[CLICK]", "on " + portDesc(clickedPort));
@@ -84,16 +98,11 @@ public class MouseHandler extends MouseAdapter {
             Debug.log("[CLICK]", "canvas (" + e.getX() + "," + e.getY() + ")");
         }
 
-
-
-        // Timeline hit-test (from GameView drawing constants)
+        // --- Timeline hit-test (مثل قبل)
         int barWidth = 300, barHeight = 20;
-        int barX = 1000 - barWidth - 40; // approx width of frame
+        int barX = 1000 - barWidth - 40;
         int barY = 700 - barHeight - 40;
-
-        int x = e.getX() ;
-        int y = e.getY();
-
+        int x = e.getX(), y = e.getY();
         if (x >= barX && x <= barX + barWidth && y >= barY && y <= barY + barHeight) {
             double clickPercent = (x - barX) / (double) barWidth;
             env.simulateFastForward(clickPercent);
@@ -101,7 +110,7 @@ public class MouseHandler extends MouseAdapter {
             return;
         }
 
-        // quick remove when clicking output with wire
+        // --- اگر روی خروجی با وایر کلیک شد: حذف سریع وایر (مثل قبل)
         if (clickedPort != null && clickedPort.getSide() == 1) {
             Wire wire = env.findWireByStartPort(clickedPort);
             if (wire != null) {
@@ -114,11 +123,36 @@ public class MouseHandler extends MouseAdapter {
                 return;
             }
         }
-        startPort = clickedPort;
+
+        // --- شروع کشیدن سیم اگر روی پورت بود
+        if (clickedPort != null) {
+            startPort = clickedPort;
+            return;
+        }
+
+        // --- در غیر این‌صورت: شروع درگِ سیستم
+        NetworkSystem sys = findSystemAt(e.getPoint());
+        if (sys != null) {
+            draggingSystem = sys;
+            dragOffsetX = e.getX() - (int) sys.getX();
+            dragOffsetY = e.getY() - (int) sys.getY();
+            return;
+        }
+
+        // otherwise: هیچ کاری لازم نیست
     }
 
     @Override
     public void mouseReleased(MouseEvent e) {
+        // پایان درگ سیستم
+        if (draggingSystem != null) {
+            draggingSystem = null;
+            env.recalcWireBudget(); // اطمینان از نهایی شدن محاسبه
+            repaintCallback.run();
+            return;
+        }
+
+        // پایان کشیدن سیم
         if (startPort != null) {
             Port endPort = findPortAt(e.getPoint());
             if (endPort != null &&
@@ -131,15 +165,10 @@ public class MouseHandler extends MouseAdapter {
                     startPort.setEmpty(false);
                     endPort.setEmpty(false);
 
-                    // از مرکز پورت‌ها استفاده کن تا خط دقیق به وسط شکل‌ها بخورد
-                    double sx = startPort.getCenterX();
-                    double sy = startPort.getCenterY();
-                    double ex = endPort.getCenterX();
-                    double ey = endPort.getCenterY();
+                    double sx = startPort.getCenterX(), sy = startPort.getCenterY();
+                    double ex = endPort.getCenterX(), ey = endPort.getCenterY();
 
-                    // دیگر نیازی به points برای منحنی نداریم
                     java.util.List<Point> points = java.util.Collections.emptyList();
-
                     Wire newWire = new Wire(
                             startPort, endPort,
                             startPort.getSystem(), startPort.getType(),
@@ -153,7 +182,6 @@ public class MouseHandler extends MouseAdapter {
                     env.setRemainingWireLength(env.getRemainingWireLength() - length);
                 }
             }
-            // reset
             startPort = null;
             currentMouse = null;
             if (endPort != null) endPort.getSystem().checkIndicator();
@@ -162,8 +190,13 @@ public class MouseHandler extends MouseAdapter {
     }
 
 
-    public Port getStartPort() { return startPort; }
-    public Point getCurrentMouse() { return currentMouse; }
+    public Port getStartPort() {
+        return startPort;
+    }
+
+    public Point getCurrentMouse() {
+        return currentMouse;
+    }
 
     private Port findPortAt(Point p) {
         for (NetworkSystem sys : env.getSystems()) {
@@ -174,6 +207,6 @@ public class MouseHandler extends MouseAdapter {
         }
         return null;
     }
-  // هم‌اندازه portSize در View
+    // هم‌اندازه portSize در View
 
 }

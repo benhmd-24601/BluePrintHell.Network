@@ -5,6 +5,7 @@ import org.example.model.Packet.Packet;
 import org.example.model.PacketQueue;
 import org.example.model.Port;
 import org.example.model.Wire;
+import org.example.util.Debug;
 
 import java.util.*;
 
@@ -34,7 +35,7 @@ public class NetworkSystem {
             inputPorts.add(new Port("triangle", -1, this, x - 15, y + 2 * spacing, true));
             outputPorts.add(new Port("square", 1, this, x + 120, y + spacing, true));
             outputPorts.add(new Port("triangle", 1, this, x + 120, y + 2 * spacing, true));
-            this.setEnabled(false);
+
 
         } else if (type == 2) {
             inputPorts.add(new Port("square", -1, this, x - 15, y + spacing - 20, true));
@@ -72,8 +73,13 @@ public class NetworkSystem {
         outputWires.put("triangle", new ArrayList<>());
     }
 
-    public void setEnv(GameEnv env) { this.env = env; }
-    public GameEnv getEnv() { return env; }
+    public void setEnv(GameEnv env) {
+        this.env = env;
+    }
+
+    public GameEnv getEnv() {
+        return env;
+    }
 
     public Packet getNextPacketForWire(String startPortType, List<Wire> allWires) {
         if (packetStorage.isEmpty()) return null;
@@ -111,14 +117,20 @@ public class NetworkSystem {
         checkIndicator();
     }
 
-    public void removeInputWire(Wire wire) { checkIndicator(); }
+    public void removeInputWire(Wire wire) {
+        checkIndicator();
+    }
 
-    public boolean canStorePacket() { return packetStorage.size() < storageCapacity; }
+    public boolean canStorePacket() {
+        return (packetStorage.size() < storageCapacity && this.isEnabled());
+    }
 
     public void addPacket(Packet packet) {
+
         if (canStorePacket()) {
             packetStorage.add(packet);
-
+            Debug.log("[STORE]", Debug.p(packet) + " in " + Debug.sys(this) +
+                    " size=" + packetStorage.size() + "/" + storageCapacity);
             String key = packet.getPortKey(); // به‌جای getType()
             if (key != null) {
                 PacketQueue q = inputQueues.get(key);
@@ -126,41 +138,84 @@ public class NetworkSystem {
             }
         } else {
             packetsDropped++;
+            Debug.log("[DROP]", Debug.p(packet) + " at " + Debug.sys(this) +
+                    " reason=storage_full dropped=" + packetsDropped);
         }
     }
 
-    public double getPacketsDropped() { return packetsDropped; }
+    public double getPacketsDropped() {
+        return packetsDropped;
+    }
 
-    public void removePacket(Packet packet) { packetStorage.remove(packet); }
+    public void removePacket(Packet packet) {
+        packetStorage.remove(packet);
+    }
 
     public void checkIndicator() {
         boolean allConnected = true;
         for (Port port : inputPorts) {
-            if (port.getIsEmpty()) { allConnected = false; break; }
+            if (port.getIsEmpty()) {
+                allConnected = false;
+                break;
+            }
         }
         this.indicatorOn = allConnected;
     }
 
-    public List<Port> getInputPorts() { return inputPorts; }
-    public List<Port> getOutputPorts() { return outputPorts; }
+    public List<Port> getInputPorts() {
+        return inputPorts;
+    }
 
-    public boolean isIndicatorOn() { return indicatorOn; }
-    public void setIndicatorOn(boolean indicatorOn) { this.indicatorOn = indicatorOn; }
+    public List<Port> getOutputPorts() {
+        return outputPorts;
+    }
 
-    public int getPacketCount() { return packetStorage.size(); }
+    public boolean isIndicatorOn() {
+        return indicatorOn;
+    }
 
-    public void update() { }
+    public void setIndicatorOn(boolean indicatorOn) {
+        this.indicatorOn = indicatorOn;
+    }
 
-    public boolean isSourceSystem() { return isSourceSystem; }
+    public int getPacketCount() {
+        return packetStorage.size();
+    }
 
-    public double getX() { return x; }
-    public double getY() { return y; }
+    public void update() {
+    }
 
-    public ArrayList<Packet> getPacketStorage() { return new ArrayList<>(packetStorage); }
+    public boolean isSourceSystem() {
+        return isSourceSystem;
+    }
 
-//***********************************************************************
+    public double getX() {
+        return x;
+    }
+
+    public double getY() {
+        return y;
+    }
+
+    public ArrayList<Packet> getPacketStorage() {
+        return new ArrayList<>(packetStorage);
+    }
+
+    //***********************************************************************
     private boolean enabled = true;
-    public boolean isEnabled() { return enabled; }
-    public void setEnabled(boolean enabled) { this.enabled = enabled; }
 
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public int getStorageCapacity() {
+        return storageCapacity;
+    }
+
+    public void setX(double x) { this.x = x; }
+    public void setY(double y) { this.y = y; }
 }

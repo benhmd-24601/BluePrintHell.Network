@@ -7,6 +7,7 @@ import org.example.model.Packet.SecretPacket1;
 import org.example.model.Packet.SecretPacket2;
 import org.example.model.Port;
 import org.example.model.Wire;
+import org.example.util.Debug;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +24,8 @@ public class SpySystem extends NetworkSystem {
         GameEnv env = getEnv();
         // محرمانه‌ها نابود می‌شوند
         if (packet instanceof SecretPacket1 || packet instanceof SecretPacket2) {
-            env.markAsLost(packet);
+            Debug.log("[SPY]", "destroy secret " + Debug.p(packet));
+            env.markAsLost(packet, "spy_secret");
             return;
         }
 
@@ -47,6 +49,8 @@ public class SpySystem extends NetworkSystem {
             if (w != null && !w.isBusy() && w.getEndSystem().isEnabled()) {
                 w.setCurrentPacket(packet);
                 packet.setDirectionForward();
+                Debug.log("[SPY]", "teleport " + Debug.p(packet) + " to " + Debug.sys(exit) +
+                        " via " + Debug.wire(w));
                 return;
             }
         }
