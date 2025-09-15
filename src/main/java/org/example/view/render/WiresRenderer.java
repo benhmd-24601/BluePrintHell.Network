@@ -17,12 +17,12 @@ public class WiresRenderer implements LayerRenderer {
 
     @Override
     public void paint(Graphics2D g2, RenderContext ctx) {
-        List<Wire> wires = ctx.getEnv().getWires(); // اگر جاوات قدیمیه از var استفاده نکن
+        List<Wire> wires = ctx.getEnv().getWires();
         g2.setStroke(new BasicStroke(2f));
         boolean over = ctx.getEnv().isOverBudget();
 
         for (Wire w : wires) {
-            // رنگ
+            // رنگ سیم
             if (over) g2.setColor(Color.RED);
             else {
                 switch (w.getStartPortType()) {
@@ -37,13 +37,15 @@ public class WiresRenderer implements LayerRenderer {
             double ex = w.getEndX(),  ey = w.getEndY();
 
             if (w.hasControlPoint()) {
-                Point2D.Double c = w.getControlPoint();
-                QuadCurve2D.Double qc = new QuadCurve2D.Double(sx, sy, c.x, c.y, ex, ey);
+                // کنترل‌پوینت واقعی از روی Anchor
+                Point2D.Double C = w.getQuadraticControlFromAnchor();
+                QuadCurve2D.Double qc = new QuadCurve2D.Double(sx, sy, C.x, C.y, ex, ey);
                 g2.draw(qc);
 
-                // هندل کنترل
+                // دکمه‌ی درگ (روی خود مسیر = Anchor)
+                Point2D.Double A = w.getControlPoint();
                 int r = 6;
-                Shape knob = new Ellipse2D.Double(c.x - r, c.y - r, 2 * r, 2 * r);
+                Shape knob = new Ellipse2D.Double(A.x - r, A.y - r, 2 * r, 2 * r);
                 g2.setColor(new Color(255, 255, 255, 200));
                 g2.fill(knob);
                 g2.setColor(Color.DARK_GRAY);

@@ -7,6 +7,7 @@ import org.example.util.Debug;
 
 import java.awt.*;
 import java.awt.geom.Point2D;
+import java.awt.geom.Rectangle2D;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
@@ -16,16 +17,21 @@ public class Wire {
     private final NetworkSystem endSystem;
     private final String startPortType;
     private final String endPortType;
-    private final double length;
+    private final double length; // طول اولیه‌ی خط مستقیم (برای ساخت)
     private Packet currentPacket;
-    private final double Sx, Sy, Ex, Ey;
+    private final double Sx, Sy, Ex, Ey; // مختصات اولیه‌ی نقاط اتصال (اگر پورت null باشد)
     private final Port startPort;
     private final Port endPort;
-    private final List<Point> points;
+    private final List<Point> points; // فعلاً استفاده نمی‌شود
     private final GameEnv env;
-    private Point2D.Double control;
-    // NEW:
+
+    // نقطه‌ی قابل‌درگ روی «خود مسیر» (anchor-on-curve) — نه کنترل‌پوینت حقیقی Bezier
+    private Point2D.Double bendAnchor = null;
+
+    // فلگ قدیمی
     private final boolean curved;
+
+    // شمارنده‌ی عبور پکت حجیم
     private int heavyPasses = 0;
 
     public Wire(Port startPort, Port endPort,
@@ -51,74 +57,130 @@ public class Wire {
         this.endPortType = endPortType;
         this.length = length;
         this.currentPacket = null;
-        this.Sx = Sx ;
-        this.Sy = Sy ;
+        this.Sx = Sx;
+        this.Sy = Sy;
         this.Ex = Ex;
-        this.Ey = Ey ;
+        this.Ey = Ey;
         this.points = points;
         this.env = env;
         this.curved = curved;
     }
+    /** آیا مسیر این سیم از روی بدنه‌ی این سیستم عبور می‌کند؟ (مبدا/مقصد نادیده گرفته می‌شوند) */
+    public boolean crossesSystem(NetworkSystem sys) {
+        if (sys == null) return false;
+        if (sys == startSystem || sys == endSystem) return false; // پورت‌های اتصال اجازه دارند کنار بدنه باشند
 
-    // --- API جدید:
-    public boolean hasControlPoint() { return control != null; }
-    public Point2D.Double getControlPoint() { return control; }
+        // کادر بدنه: همانی که در MouseHandler برای hit-test استفاده می‌کنی (120×160)
+        Rectangle2D.Double rect = new Rectangle2D.Double(sys.getX(), sys.getY(), 120, 160);
 
-    public void setControlPoint(double x, double y) {
-        if (control == null) control = new Point2D.Double(x, y);
-        else { control.x = x; control.y = y; }
-        // اگر از فلگ قدیمی curved استفاده می‌کنی، این را هم ست کن:
-        // this.curved = true;
+        double sx = getStartx(), sy = getStarty();
+        double ex = getEndX(),  ey = getEndY();
+
+        // اگر سیم مستقیم است
+        if (!hasControlPoint()) {
+            // اگر هر نقطه‌ی مسیر داخل مستطیل بود (به‌ندرت برای خط مستقیم) یا خط با کادر برخورد داشت
+            if (rect.contains(sx, sy) || rect.contains(ex, ey)) return true;
+            return rect.intersectsLine(sx, sy, ex, ey);
+        }
+
+        // اگر سیم خم‌شده است: نمونه‌گیری
+        final int N = 40;
+        Point2D.Double prev = getPointAt(0.0);
+        if (rect.contains(prev)) return true;
+
+        for (int i = 1; i <= N; i++) {
+            double t = i / (double) N;
+            Point2D.Double pt = getPointAt(t);
+            if (rect.contains(pt)) return true;
+            if (rect.intersectsLine(prev.x, prev.y, pt.x, pt.y)) return true;
+            prev = pt;
+        }
+        return false;
     }
-    public void clearControlPoint() { control = null; /* curved=false; */ }
 
-    /** نقطهٔ روی مسیر برای t ∈ [0..1] */
+    /** آیا این سیم از روی بدنه‌ی حداقل یک سیستم عبور می‌کند؟ */
+    public boolean crossesAnySystem(GameEnv env) {
+        for (NetworkSystem s : env.getSystems()) {
+            if (crossesSystem(s)) return true;
+        }
+        return false;
+    }
+
+    // ---------- API خم‌کردن: Anchor روی خود مسیر ----------
+    /** آیا نقطه‌ی خم (anchor-on-curve) داریم؟ */
+    public boolean hasControlPoint() { return bendAnchor != null; }
+
+    /** گرفتن anchor (روی مسیر) — برای رندر دکمه‌ی سفید */
+    public Point2D.Double getControlPoint() { return bendAnchor; }
+
+    /** ست‌کردن anchor (روی مسیر) — دایره‌ی قابل‌درگ */
+    public void setControlPoint(double x, double y) {
+        if (bendAnchor == null) bendAnchor = new Point2D.Double(x, y);
+        else { bendAnchor.x = x; bendAnchor.y = y; }
+    }
+
+    /** حذف خم */
+    public void clearControlPoint() { bendAnchor = null; }
+
+    /** کنترل‌پوینت حقیقی Bezier درجه‌۲ را از روی anchor در t=0.5 محاسبه می‌کند. */
+    public Point2D.Double getQuadraticControlFromAnchor() {
+        if (!hasControlPoint()) return null;
+        double sx = getStartx(), sy = getStarty();
+        double ex = getEndX(),  ey = getEndY();
+
+        // برای t=0.5: C = 2*A - 0.5*(S + E)
+        double cx = 2.0 * bendAnchor.x - 0.5 * (sx + ex);
+        double cy = 2.0 * bendAnchor.y - 0.5 * (sy + ey);
+        return new Point2D.Double(cx, cy);
+    }
+
+    /** نقطه روی مسیر برای t∈[0,1] (خط مستقیم یا منحنی درجه‌۲) */
     public Point2D.Double getPointAt(double t) {
         double sx = getStartx(), sy = getStarty();
         double ex = getEndX(),  ey = getEndY();
+
         if (!hasControlPoint()) {
             // خط مستقیم
-            return new Point2D.Double(
-                    sx + (ex - sx) * t,
-                    sy + (ey - sy) * t
-            );
+            double x = sx + (ex - sx) * t;
+            double y = sy + (ey - sy) * t;
+            return new Point2D.Double(x, y);
         } else {
-            // منحنی کوادراتیک: B(t) = (1-t)^2 S + 2(1-t)t C + t^2 E
-            double one = 1.0 - t;
-            double cx = control.x, cy = control.y;
-            double x = one*one*sx + 2*one*t*cx + t*t*ex;
-            double y = one*one*sy + 2*one*t*cy + t*t*ey;
+            // منحنی درجه‌۲: P(t) = (1-t)^2*S + 2(1-t)t*C + t^2*E
+            Point2D.Double C = getQuadraticControlFromAnchor();
+            double u = 1.0 - t;
+            double x = u*u*sx + 2*u*t*C.x + t*t*ex;
+            double y = u*u*sy + 2*u*t*C.y + t*t*ey;
             return new Point2D.Double(x, y);
         }
     }
 
-    /** طول مسیر: مستقیم دقیق؛ منحنی → تقریب نمونه‌گیری */
+    /** طول لحظه‌ای مسیر: مستقیم دقیق؛ منحنی با نمونه‌گیری تقریب زده می‌شود. */
     public double getLength() {
-        double sx = getStartx(), sy = getStarty();
-        double ex = getEndX(),  ey = getEndY();
-
         if (!hasControlPoint()) {
-            return Math.hypot(ex - sx, ey - sy);
+            double dx = getEndX() - getStartx();
+            double dy = getEndY() - getStarty();
+            return Math.hypot(dx, dy);
         } else {
-            // تقریب طول منحنی با نمونه‌گیری
-            final int N = 24; // هر چه بیشتر، دقیق‌تر
-            double prevX = sx, prevY = sy;
             double len = 0.0;
+            Point2D.Double prev = getPointAt(0.0);
+            final int N = 40; // دقت بیشتر → طول دقیق‌تر
             for (int i = 1; i <= N; i++) {
                 double t = i / (double) N;
                 Point2D.Double pt = getPointAt(t);
-                len += Math.hypot(pt.x - prevX, pt.y - prevY);
-                prevX = pt.x; prevY = pt.y;
+                len += pt.distance(prev);
+                prev = pt;
             }
             return len;
         }
     }
+
     public boolean isCurved(){ return curved; }
     public GameEnv getEnv(){ return env; }
 
+    // ---------- حلقه‌ی سیم ----------
     public void update() {
         if (currentPacket == null && startSystem != null) {
-            // مقصد باید فعال باشد؛ و پکت با این پورت سازگار باشد
+            // مقصد باید فعال باشد
             if (!endSystem.isEnabled()) return;
 
             Packet packet = startSystem.getNextPacketForWire(startPortType, startSystem.getAllConnectedWires());
@@ -132,17 +194,11 @@ public class Wire {
                         " compat=" + (packet.getCompatibilityKey()==null? "*" : packet.getCompatibilityKey()) +
                         "/" + startPortType);
 
+                // کُند کردن پیام‌رسان‌های ناسازگار (منطق قدیمی)
                 if (packet.getCompatibilityKey() != null &&
-                        !packet.getCompatibilityKey().equals(startPortType)) {
-                    // همین‌جا بعد از کاهش سرعت، لاگ کن
+                        !Objects.equals(packet.getCompatibilityKey(), startPortType)) {
                     Debug.log("[WIRE]", "mismatch slow " + Debug.p(packet) +
                             " v=" + Debug.fmt(packet.getInstantSpeed()));
-                }
-
-
-                // اگر ناسازگار بود (برای پیام‌رسان‌ها معنی دارد)، سرعتش را 0.7 کن (منطق قدیمی شما)
-                if (packet.getCompatibilityKey() != null &&
-                        !packet.getCompatibilityKey().equals(startPortType)) {
                     packet.setSpeed(packet.getInstantSpeed() * 0.7);
                 }
             }
@@ -155,14 +211,15 @@ public class Wire {
     }
 
     public void deliverCurrentPacket() {
-
         if (currentPacket == null) return;
+
         Packet p = currentPacket;
         double v = p.getInstantSpeed();
         if (v > ModelConfig.SYS_DISABLE_SPEED_THRESH) {
             endSystem.disableFor(5.0);
             org.example.util.Debug.log("[SYS]", "disabled by overspeed v=" + org.example.util.Debug.fmt(v));
         }
+
         boolean forward = p.isGoingForward();
         if (forward) {
             if (!endSystem.isEnabled()) {
@@ -197,7 +254,6 @@ public class Wire {
 
             if (p instanceof HeavyPacket && endPort != null) {
                 endPort.setType(new Random().nextBoolean() ? "square" : "triangle");
-
                 Debug.log("[WIRE]", "heavy flipped end-port of " + Debug.sys(endSystem) +
                         " to " + endPort.getType());
             }
@@ -213,60 +269,6 @@ public class Wire {
             endSystem.removePacket(p);
             currentPacket = null;
         }
-
-//        if (currentPacket == null) return;
-//        Packet p = currentPacket;
-//
-//        boolean forward = p.isGoingForward();
-//
-//        if (forward) {
-//            // اگر مقصد در لحظه‌ی رسیدن غیرفعال شد → برگشت
-//            if (!endSystem.isEnabled()) {
-//                p.bounceBackFromEnd();
-//                return;
-//            }
-//
-//            // عبور «حجیم» را بشمار، شاید سیم نابود شود
-//            if (p instanceof HeavyPacket) {
-//                heavyPasses++;
-//            }
-//
-//            // پکت تحویل مقصد
-//            p.onDelivered(env, endSystem);
-//
-//            // «اگر» پیام‌رسان از پورت ناسازگار وارد این سیستم شده بود → سرعت خروج بعدی ×2
-//            if (p.getCompatibilityKey() != null &&
-//                    !Objects.equals(p.getCompatibilityKey(), this.startPortType)) {
-//                p.setSpeed(p.getInstantSpeed() * 2.0);
-//            }
-//
-//            endSystem.addPacket(p);
-//            startSystem.removePacket(p);
-//            currentPacket = null;
-//
-//            // نابودی سیم بعد از 3 عبور حجیم
-//            if (heavyPasses >= ModelConfig.HEAVY_WIRE_MAX_PASSES) {
-//                env.removeWire(this);
-//            }
-//
-//            // اگر پکت حجیم بود: پورت ورودیِ سیستم مقصد را تصادفی تغییر بده
-//            if (p instanceof HeavyPacket && endPort != null) {
-//                endPort.setType(new Random().nextBoolean() ? "square" : "triangle");
-//            }
-//
-//        } else {
-//            // رسیدن به مبدا در حالت برگشت
-//            if (!startSystem.isEnabled()) {
-//                p.setDirectionForward();
-//                return;
-//            }
-//            p.onDelivered(env, startSystem);
-//            startSystem.addPacket(p);
-//            endSystem.removePacket(p);
-//            currentPacket = null;
-//
-//            // اگر حجیم بود و از این سر رد شد، شمارش عبور را هم به‌دلخواه می‌توانید اضافه کنید
-//        }
     }
 
     public boolean isBusy() { return currentPacket != null; }
@@ -275,31 +277,18 @@ public class Wire {
     public NetworkSystem getStartSystem() { return startSystem; }
     public NetworkSystem getEndSystem() { return endSystem; }
 
-
     public String getStartPortType() { return startPortType; }
     public String getEndPortType() { return endPortType; }
     public List<Point>  getPoints() { return points; }
 
-    public Port getStartPort() {
-        return startPort;
-    }
+    public Port getStartPort() { return startPort; }
+    public Port getEndPort() { return endPort; }
 
-    public Port getEndPort() {
-        return endPort;
-    }
-
-    public int getHeavyPasses() {
-        return heavyPasses;
-    }
-
-    public void setHeavyPasses(int heavyPasses) {
-        this.heavyPasses = heavyPasses;
-    }
+    public int getHeavyPasses() { return heavyPasses; }
+    public void setHeavyPasses(int heavyPasses) { this.heavyPasses = heavyPasses; }
 
     public double getStartx() { return (startPort != null) ? startPort.getCenterX() : Sx; }
     public double getStarty() { return (startPort != null) ? startPort.getCenterY() : Sy; }
     public double getEndX()   { return (endPort   != null) ? endPort.getCenterX()   : Ex; }
     public double getEndY()   { return (endPort   != null) ? endPort.getCenterY()   : Ey; }
-
-
 }
