@@ -154,7 +154,12 @@ public class GameEnv {
         }
     }
     // endregion
-
+    public boolean hasAnyWireCrossing() {
+        for (Wire w : wires) {
+            if (w.crossesAnySystem(this)) return true;
+        }
+        return false;
+    }
     public void setOnGameOver(Runnable onGameOver) { this.onGameOver = onGameOver; }
 
     public boolean isGameOver() {
@@ -199,6 +204,10 @@ public class GameEnv {
     private int nextPacketId = 0;
 
     public void generate(double delta) {
+        if (hasAnyWireCrossing()) {
+            Debug.log("[SAFE]", "Generation blocked: a wire crosses a system body.");
+            return;
+        }
         List<Packet> newPackets = new ArrayList<>();
         for (NetworkSystem system : systems) {
             if (system instanceof SourceSystem src && src.isGenerating()) {

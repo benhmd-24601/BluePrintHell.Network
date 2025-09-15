@@ -1,3 +1,4 @@
+// WiresRenderer.java
 package org.example.view.render;
 
 import org.example.model.Wire;
@@ -19,17 +20,20 @@ public class WiresRenderer implements LayerRenderer {
     public void paint(Graphics2D g2, RenderContext ctx) {
         List<Wire> wires = ctx.getEnv().getWires();
         g2.setStroke(new BasicStroke(2f));
-        boolean over = ctx.getEnv().isOverBudget();
 
         for (Wire w : wires) {
-            // رنگ سیم
-            if (over) g2.setColor(Color.RED);
-            else {
+            boolean overBudget = ctx.getEnv().isOverBudget();
+            boolean crossing   = w.crossesAnySystem(ctx.getEnv());
+
+            // رنگ پایه
+            if (overBudget || crossing) {
+                g2.setColor(Color.RED);
+            } else {
                 switch (w.getStartPortType()) {
-                    case "square" -> g2.setColor(Color.GREEN);
+                    case "square"   -> g2.setColor(Color.GREEN);
                     case "triangle" -> g2.setColor(Color.YELLOW);
-                    case "circle" -> g2.setColor(Color.BLACK);
-                    default -> g2.setColor(Color.LIGHT_GRAY);
+                    case "circle"   -> g2.setColor(Color.BLACK);
+                    default         -> g2.setColor(Color.LIGHT_GRAY);
                 }
             }
 
@@ -37,12 +41,11 @@ public class WiresRenderer implements LayerRenderer {
             double ex = w.getEndX(),  ey = w.getEndY();
 
             if (w.hasControlPoint()) {
-                // کنترل‌پوینت واقعی از روی Anchor
                 Point2D.Double C = w.getQuadraticControlFromAnchor();
                 QuadCurve2D.Double qc = new QuadCurve2D.Double(sx, sy, C.x, C.y, ex, ey);
                 g2.draw(qc);
 
-                // دکمه‌ی درگ (روی خود مسیر = Anchor)
+                // دستگیره‌ی درگ (anchor)
                 Point2D.Double A = w.getControlPoint();
                 int r = 6;
                 Shape knob = new Ellipse2D.Double(A.x - r, A.y - r, 2 * r, 2 * r);
