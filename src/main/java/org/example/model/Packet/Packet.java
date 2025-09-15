@@ -113,6 +113,40 @@ public abstract class Packet {
     }
 
     // --- حرکت
+//    public void updatePosition(double delta) {
+//        if (wire == null) return;
+//
+//        long now = System.nanoTime();
+//        if (lastUpdateNs == 0) lastUpdateNs = now;
+//        timeOnThisWireSec += (now - lastUpdateNs) / 1_000_000_000.0;
+//        lastUpdateNs = now;
+//
+//        if (timeOnThisWireSec > PACKET_WIRE_TIMEOUT) {
+//            wire.getEnv().markAsLost(this , "timeout_on_wire>" + PACKET_WIRE_TIMEOUT + "s");
+//            if (wire.getCurrentPacket() == this) wire.setCurrentPacket(null);
+//            return;
+//        }
+//
+//
+//        // v = v0 + a*dt
+//        speed += accel * delta;
+//
+//        double totalLen = wire.getLength();
+//        double dp = speed * delta * (direction > 0 ? +1 : -1);
+//        progress = Math.max(0, Math.min(totalLen, progress + dp));
+//
+//        double t = (totalLen == 0) ? (isGoingForward()? 1.0 : 0.0) : (progress / totalLen);
+//        double sx = wire.getStartx(), sy = wire.getStarty();
+//        double ex = wire.getEndX(),  ey = wire.getEndY();
+//        double baseX = sx + (ex - sx) * t;
+//        double baseY = sy + (ey - sy) * t;
+//        this.wireX = baseX;
+//        this.wireY = baseY;
+//
+//        // رسیدن به انتهای مسیر
+//        if (reachedDestination()) wire.deliverCurrentPacket();
+//    }
+    // --- حرکت (نسخه‌ی جدید با پشتیبانی از سیم خم‌دار)
     public void updatePosition(double delta) {
         if (wire == null) return;
 
@@ -127,25 +161,24 @@ public abstract class Packet {
             return;
         }
 
-
         // v = v0 + a*dt
         speed += accel * delta;
 
+        // پیشروی برحسب طول مسیر (چه خطی چه منحنی)
         double totalLen = wire.getLength();
         double dp = speed * delta * (direction > 0 ? +1 : -1);
-        progress = Math.max(0, Math.min(totalLen, progress + dp));
+        progress = Math.max(0.0, Math.min(totalLen, progress + dp));
 
-        double t = (totalLen == 0) ? (isGoingForward()? 1.0 : 0.0) : (progress / totalLen);
-        double sx = wire.getStartx(), sy = wire.getStarty();
-        double ex = wire.getEndX(),  ey = wire.getEndY();
-        double baseX = sx + (ex - sx) * t;
-        double baseY = sy + (ey - sy) * t;
-        this.wireX = baseX;
-        this.wireY = baseY;
+        // t نرمال‌شده و گرفتن نقطه از مسیر واقعی سیم
+        double t = (totalLen <= 1e-9) ? (isGoingForward() ? 1.0 : 0.0) : (progress / totalLen);
+        java.awt.geom.Point2D.Double pt = wire.getPointAt(t);
+        this.wireX = pt.x;
+        this.wireY = pt.y;
 
         // رسیدن به انتهای مسیر
         if (reachedDestination()) wire.deliverCurrentPacket();
     }
+
 
     public void setProgress(double progress) {
         this.progress = progress;

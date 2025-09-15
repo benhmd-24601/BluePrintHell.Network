@@ -6,6 +6,7 @@ import org.example.model.Systems.NetworkSystem;
 import org.example.util.Debug;
 
 import java.awt.*;
+import java.awt.geom.Point2D;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
@@ -22,7 +23,7 @@ public class Wire {
     private final Port endPort;
     private final List<Point> points;
     private final GameEnv env;
-
+    private Point2D.Double control;
     // NEW:
     private final boolean curved;
     private int heavyPasses = 0;
@@ -59,6 +60,59 @@ public class Wire {
         this.curved = curved;
     }
 
+    // --- API جدید:
+    public boolean hasControlPoint() { return control != null; }
+    public Point2D.Double getControlPoint() { return control; }
+
+    public void setControlPoint(double x, double y) {
+        if (control == null) control = new Point2D.Double(x, y);
+        else { control.x = x; control.y = y; }
+        // اگر از فلگ قدیمی curved استفاده می‌کنی، این را هم ست کن:
+        // this.curved = true;
+    }
+    public void clearControlPoint() { control = null; /* curved=false; */ }
+
+    /** نقطهٔ روی مسیر برای t ∈ [0..1] */
+    public Point2D.Double getPointAt(double t) {
+        double sx = getStartx(), sy = getStarty();
+        double ex = getEndX(),  ey = getEndY();
+        if (!hasControlPoint()) {
+            // خط مستقیم
+            return new Point2D.Double(
+                    sx + (ex - sx) * t,
+                    sy + (ey - sy) * t
+            );
+        } else {
+            // منحنی کوادراتیک: B(t) = (1-t)^2 S + 2(1-t)t C + t^2 E
+            double one = 1.0 - t;
+            double cx = control.x, cy = control.y;
+            double x = one*one*sx + 2*one*t*cx + t*t*ex;
+            double y = one*one*sy + 2*one*t*cy + t*t*ey;
+            return new Point2D.Double(x, y);
+        }
+    }
+
+    /** طول مسیر: مستقیم دقیق؛ منحنی → تقریب نمونه‌گیری */
+    public double getLength() {
+        double sx = getStartx(), sy = getStarty();
+        double ex = getEndX(),  ey = getEndY();
+
+        if (!hasControlPoint()) {
+            return Math.hypot(ex - sx, ey - sy);
+        } else {
+            // تقریب طول منحنی با نمونه‌گیری
+            final int N = 24; // هر چه بیشتر، دقیق‌تر
+            double prevX = sx, prevY = sy;
+            double len = 0.0;
+            for (int i = 1; i <= N; i++) {
+                double t = i / (double) N;
+                Point2D.Double pt = getPointAt(t);
+                len += Math.hypot(pt.x - prevX, pt.y - prevY);
+                prevX = pt.x; prevY = pt.y;
+            }
+            return len;
+        }
+    }
     public boolean isCurved(){ return curved; }
     public GameEnv getEnv(){ return env; }
 
@@ -247,10 +301,5 @@ public class Wire {
     public double getEndX()   { return (endPort   != null) ? endPort.getCenterX()   : Ex; }
     public double getEndY()   { return (endPort   != null) ? endPort.getCenterY()   : Ey; }
 
-    /** طول لحظه‌ای سیم از روی مختصات فعلی پورت‌ها */
-    public double getLength() {
-        double dx = getEndX() - getStartx();
-        double dy = getEndY() - getStarty();
-        return Math.hypot(dx, dy);
-    }
+
 }
