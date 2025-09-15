@@ -27,7 +27,7 @@ public class CirclePacket extends Packet {
     @Override public int getSize() { return 1; }
     @Override public int getCoinValue() { return COIN_CIRCLE; }
     @Override public String getPortKey() { return "circle"; }
-    @Override public String getCompatibilityKey() { return "square"; }
+    @Override public String getCompatibilityKey() { return "circle"; }
 
     @Override
     protected void onEnterWire(Wire w) {
