@@ -357,7 +357,7 @@ public class BaseSystemRenderer<T extends NetworkSystem> implements SystemRender
                 (s instanceof SinkSystem sink) ? sink.getReceivedPackets()
                         : s.getPacketStorage();
 
-        int cell = 14, gap = 4, cols = 6;
+        int cell = 14, gap = 4, cols = 5;
 
 
         // عنوان

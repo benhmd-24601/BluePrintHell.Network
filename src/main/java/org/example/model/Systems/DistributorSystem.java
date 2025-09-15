@@ -8,7 +8,9 @@ import java.util.*;
 public class DistributorSystem extends NetworkSystem {
     private final Random rnd = new Random();
 
-    public DistributorSystem(double x, double y) { super(x, y, 1); }
+    public DistributorSystem(double x, double y) { super(x, y, 1);
+        setStorageCapacity(Integer.MAX_VALUE); // یا مثلاً 1000
+    }
 
     @Override
     public void addPacket(Packet packet) {

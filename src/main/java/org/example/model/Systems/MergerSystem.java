@@ -14,7 +14,9 @@ public class MergerSystem extends NetworkSystem {
 
     private final Map<String, List<BitPacket>> buckets = new HashMap<>();
 
-    public MergerSystem(double x, double y) { super(x, y, 1); }
+    public MergerSystem(double x, double y) { super(x, y, 1);
+        setStorageCapacity(Integer.MAX_VALUE); // یا مثلاً 1000
+    }
 
     @Override
     public void addPacket(Packet packet) {

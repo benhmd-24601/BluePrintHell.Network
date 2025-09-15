@@ -110,6 +110,7 @@ public class GameController {
 
                 gameView.addCustomComponent(btn);
             }
+
         }
     }
 

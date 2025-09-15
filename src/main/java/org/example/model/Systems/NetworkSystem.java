@@ -61,12 +61,18 @@ public class NetworkSystem {
             outputPorts.add(new Port("square", 1, this, x + 120, y + spacing, true));
             outputPorts.add(new Port("triangle", 1, this, x + 120, y + 2 * spacing, true));
         } else if (type == 5) {
+            inputPorts.add(new Port("square", -1, this, x - 15,y + spacing , true));
             inputPorts.add(new Port("triangle", -1, this, x - 15, y + 2 * spacing, true));
             outputPorts.add(new Port("square", 1, this, x + 120, y + spacing, true));
             outputPorts.add(new Port("triangle", 1, this, x + 120, y + 2 * spacing, true));
         } else if (type == 6) {
             inputPorts.add(new Port("square", -1, this, x - 15, y + 2 * spacing, true));
             outputPorts.add(new Port("square", 1, this, x + 120, y + spacing, true));
+        }
+        else if (type == 7){
+            inputPorts.add(new Port("circle" , -1 , this , x - 15 , y + 3 * spacing  ,true));
+            outputPorts.add(new Port("circle" , 1 , this , x  +120 , y + 3 * spacing  ,true));
+
         }
 
         this.x = x - 6;
@@ -246,4 +252,9 @@ public class NetworkSystem {
     public double getReenableTimerSec() {
         return Math.max(0, reenableTimerSec);
     }
+    public void setStorageCapacity(int capacity) {
+        this.storageCapacity = Math.max(0, capacity);
+    }
+    public boolean isGenerating() { return false; }   // پیش‌فرض: تولید ندارد
+    public void setGenerating(boolean generating) { /* no-op */ }
 }

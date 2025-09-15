@@ -169,6 +169,7 @@ public class GameEnv {
         if (allpackets <= 0) return false;
         double lossPercent = (packetLoss + droppedPackets) / allpackets * 100.0;
         return lossPercent >= 50.0;
+
     }
 
     public double getTotalPacketLossPercent() {
