@@ -10,26 +10,24 @@ import static org.example.model.ModelConfig.*;
 
 public abstract class Packet {
 
-    // --- وضعیت مکانی روی سیم
     protected double wireX, wireY;
     protected double offsetX = 0, offsetY = 0;
     private static final double OFF_WIRE_THRESHOLD = 7.0;
 
-    // سیم/پیشروی
     protected Wire wire;
     protected double progress = 0.0;
-    protected int direction = +1;               // +1 جلو، -1 عقب
+    protected int direction = +1;
     private long lastUpdateNs = 0;
     private double timeOnThisWireSec = 0.0;
 
-    // حرکت
-    protected double speed = BASE_SPEED_MSG;    // سرعت لحظه‌ای
-    protected double accel = 0.0;               // شتاب لحظه‌ای
+    protected double speed = BASE_SPEED_MSG;
+    protected double accel = 0.0;
 
-    // نویز
+    // NEW: وقتی توسط Aergia «شتاب» قفل شد (صفر بماند)
+    private boolean accelFrozen = false;
+
     protected double noiseLevel = 0.0;
 
-    // متفرقه
     private final List<Packet> currentCollisions = new ArrayList<>();
     private final List<Packet> currentImpact = new ArrayList<>();
     private int id;
@@ -39,7 +37,6 @@ public abstract class Packet {
         this.wireY = y;
     }
 
-    // --- API عمومی
     public void setId(int id) { this.id = id; }
     public int getId() { return id; }
 
@@ -48,7 +45,8 @@ public abstract class Packet {
         this.wire = w;
         this.timeOnThisWireSec = 0.0;
         this.lastUpdateNs = System.nanoTime();
-        if (direction > 0) this.progress = 0.0; else this.progress = w.getLength();
+        if (direction > 0) this.progress = 0.0; else this.progress = (w == null ? 0.0 : w.getLength());
+        this.accelFrozen = false; // ریست وقتی وارد سیم می‌شود
         onEnterWire(w);
     }
 
@@ -60,7 +58,14 @@ public abstract class Packet {
     public void setNoiseLevel(double v) { noiseLevel = v; }
 
     public void setSpeed(double v) { speed = Math.max(SPEED_MIN, v); }
-    public void setAccel(double a) { accel = a; }
+    public void setAccel(double a) {
+        accel = a;
+        if (a != 0.0) accelFrozen = false; // طبق متن: «تا زمانی که مجدداً شتابی به آنها اعمال نشده باشد»
+    }
+    public void freezeAccelToZero() {
+        accel = 0.0;
+        accelFrozen = true;
+    }
 
     public void setDirectionForward(){ direction = +1; }
     public void setDirectionBackward(){ direction = -1; }
@@ -92,61 +97,20 @@ public abstract class Packet {
                 (direction < 0 && progress <= 0);
     }
 
-    // --- قلاب‌های پُلیمورفیک
-    /** کلید سازگاری (برای پورت‌ها). برای محرمانه/حجیم ممکن است null باشد. */
     public String getCompatibilityKey() { return null; }
-    /** آیا «می‌تواند» روی سِیمی با startPortType مشخص گذاشته شود؟ */
     public boolean canEnterWireWithStartType(String startType) {
         String key = getCompatibilityKey();
         return key == null || key.equals(startType);
     }
-    /** ورود به سیم: زیرکلاس‌ها سرعت/شتاب را طبق سازگار/ناسازگار تنظیم کنند */
     protected abstract void onEnterWire(Wire w);
-    /** اندازه‌ی هندسی (برای نویز/برخوردها) */
     public abstract int getSize();
-    /** سکه‌ی اضافه‌شونده هنگام تحویل به سیستم */
     public abstract int getCoinValue();
 
-    /** به مقصد تحویل شد (system فعال)، کوین بده و رفتار ویژه انجام بده */
     public void onDelivered(GameEnv env, NetworkSystem dst) {
         env.setCoins(env.getCoins() + getCoinValue());
     }
 
-    // --- حرکت
-//    public void updatePosition(double delta) {
-//        if (wire == null) return;
-//
-//        long now = System.nanoTime();
-//        if (lastUpdateNs == 0) lastUpdateNs = now;
-//        timeOnThisWireSec += (now - lastUpdateNs) / 1_000_000_000.0;
-//        lastUpdateNs = now;
-//
-//        if (timeOnThisWireSec > PACKET_WIRE_TIMEOUT) {
-//            wire.getEnv().markAsLost(this , "timeout_on_wire>" + PACKET_WIRE_TIMEOUT + "s");
-//            if (wire.getCurrentPacket() == this) wire.setCurrentPacket(null);
-//            return;
-//        }
-//
-//
-//        // v = v0 + a*dt
-//        speed += accel * delta;
-//
-//        double totalLen = wire.getLength();
-//        double dp = speed * delta * (direction > 0 ? +1 : -1);
-//        progress = Math.max(0, Math.min(totalLen, progress + dp));
-//
-//        double t = (totalLen == 0) ? (isGoingForward()? 1.0 : 0.0) : (progress / totalLen);
-//        double sx = wire.getStartx(), sy = wire.getStarty();
-//        double ex = wire.getEndX(),  ey = wire.getEndY();
-//        double baseX = sx + (ex - sx) * t;
-//        double baseY = sy + (ey - sy) * t;
-//        this.wireX = baseX;
-//        this.wireY = baseY;
-//
-//        // رسیدن به انتهای مسیر
-//        if (reachedDestination()) wire.deliverCurrentPacket();
-//    }
-    // --- حرکت (نسخه‌ی جدید با پشتیبانی از سیم خم‌دار)
+    // --- حرکت (نسخه‌ی با مسیر منحنی + اثر فیلدها)
     public void updatePosition(double delta) {
         if (wire == null) return;
 
@@ -161,44 +125,50 @@ public abstract class Packet {
             return;
         }
 
-        // v = v0 + a*dt
-        speed += accel * delta;
+        // اگر Aergia ما را فریز نکرده، شتاب اعمال می‌شود
+        if (!accelFrozen) {
+            speed += accel * delta;
+        }
 
-        // پیشروی برحسب طول مسیر (چه خطی چه منحنی)
         double totalLen = wire.getLength();
         double dp = speed * delta * (direction > 0 ? +1 : -1);
         progress = Math.max(0.0, Math.min(totalLen, progress + dp));
 
-        // t نرمال‌شده و گرفتن نقطه از مسیر واقعی سیم
         double t = (totalLen <= 1e-9) ? (isGoingForward() ? 1.0 : 0.0) : (progress / totalLen);
         java.awt.geom.Point2D.Double pt = wire.getPointAt(t);
         this.wireX = pt.x;
         this.wireY = pt.y;
 
-        // رسیدن به انتهای مسیر
+        // ===== NEW: اعمال فیلدهای Aergia / Eliphas
+        var fields = wire.getEnv().getFieldsOnWire(wire);
+        for (GameEnv.WireField f : fields) {
+            double dx = wireX - f.x, dy = wireY - f.y;
+            double dist = Math.hypot(dx, dy);
+            if (dist <= f.radius) {
+                if (f.type == GameEnv.WireField.Type.AERGIA) {
+                    // شتاب را صفر و فریز می‌کنیم → حرکت با سرعت ثابت
+                    freezeAccelToZero();
+                } else {
+                    // ELIPHAS: بازگردانی پیوسته CoM به راستای سیم
+                    // یک دَمپینگ پیوسته: offset *= exp(-k*dt)
+                    double k = 8.0; // نرخ برگشت
+                    double damper = Math.exp(-k * delta);
+                    offsetX *= damper;
+                    offsetY *= damper;
+                }
+            }
+        }
+
         if (reachedDestination()) wire.deliverCurrentPacket();
     }
 
+    public void setProgress(double progress) { this.progress = progress; }
+    public void setDirection(int direction) { this.direction = direction; }
 
-    public void setProgress(double progress) {
-        this.progress = progress;
-    }
+    public String getPortKey() { return null; }
 
-    public void setDirection(int direction) {
-        this.direction = direction;
-    }
-    public String getPortKey() {
-        return null; // پیش‌فرض: پکتی که پورت‌محور نیست
-    }
-    private boolean teleported = false;          // ← NEW
-
-    public boolean isTeleported() {              // ← NEW
-        return teleported;
-    }
-    public void setTeleported(boolean t) {       // ← NEW
-        this.teleported = t;
-    }
-    public void markTeleported() {               // ← NEW
-        this.teleported = true;
-    }
+    private boolean teleported = false;
+    public boolean isTeleported() { return teleported; }
+    public void setTeleported(boolean t) { this.teleported = t; }
+    public void markTeleported() { this.teleported = true; }
 }

@@ -16,17 +16,16 @@ public class MouseHandler extends MouseAdapter {
     private Port startPort;
     private Point currentMouse;
 
-    // برای گزارش hover فقط وقتی تغییر می‌کند
     private Port lastHoverPort = null;
 
     private NetworkSystem draggingSystem = null;
     private int dragOffsetX = 0, dragOffsetY = 0;
 
     // === خم‌کردن سیم (Multi-Anchor)
-    private Wire bendingWire = null;          // سیمی که در حال درگِ نودش هستیم
-    private int  bendingAnchorIdx = -1;       // اندیس نودی که درگ می‌شود
-    private static final int HANDLE_HIT_R = 10; // شعاع هیت‌تست برای نود
-    private static final int PATH_HIT_DIST = 6; // تلورانس نزدیکی کلیک به مسیر سیم
+    private Wire bendingWire = null;
+    private int  bendingAnchorIdx = -1;
+    private static final int HANDLE_HIT_R = 10;
+    private static final int PATH_HIT_DIST = 6;
 
     private NetworkSystem findSystemAt(Point p) {
         for (NetworkSystem s : env.getSystems()) {
@@ -43,8 +42,8 @@ public class MouseHandler extends MouseAdapter {
 
     private String portDesc(Port p) {
         String side = p.getSide() == 1 ? "OUT" : "IN";
-        return side + " " + p.getType() + " port@(" + (int) p.getX() + "," + (int) p.getY() +
-                ") of sys@(" + (int) p.getSystem().getX() + "," + (int) p.getSystem().getY() + ")";
+        return side + " " + p.getType() + " port@(" + (int) p.getX() + "," + (int) p.getY() + ")"
+                + " of sys@(" + (int) p.getSystem().getX() + "," + (int) p.getSystem().getY() + ")";
     }
 
     @Override
@@ -62,7 +61,6 @@ public class MouseHandler extends MouseAdapter {
             lastHoverPort = hover;
         }
 
-        // --- PREVIEW: وقتی در حال کشیدن سیم هستیم، هر موو پریویو را آپدیت کن
         if (startPort != null) {
             Port candidateEnd = tryFindCompatibleEmptyEndPort(e.getPoint(), startPort);
             env.setWirePreview(startPort, e.getPoint(), candidateEnd);
@@ -77,24 +75,37 @@ public class MouseHandler extends MouseAdapter {
     public void mouseDragged(MouseEvent e) {
         currentMouse = e.getPoint();
 
-        // === اگر در حال درگ یک نود هستیم: فقط همان نود را جابجا کن (نود جدید نساز!)
+        // درگ نود کرو
         if (bendingWire != null && bendingAnchorIdx >= 0) {
             bendingWire.setAnchor(bendingAnchorIdx, e.getX(), e.getY());
-            env.recalcWireBudget(); // اگر طول تغییر کند
+            env.recalcWireBudget();
             repaintCallback.run();
             return;
         }
 
-        // درگ سیستم؟
-        if (draggingSystem != null) {
-            int nx = e.getX() - dragOffsetX;
-            int ny = e.getY() - dragOffsetY;
-            env.moveSystem(draggingSystem, nx, ny);
+        // === فقط اگر سیزیفوسِ درگ فعاله اجازه‌ی جابه‌جایی بده
+        if (draggingSystem != null && env.getPlacementMode() == GameEnv.PlacementMode.SISYPHUS_DRAG) {
+            double ox = env.getSisyphusOriginX();
+            double oy = env.getSisyphusOriginY();
+            double tx = e.getX() - dragOffsetX;
+            double ty = e.getY() - dragOffsetY;
+
+            double dx = tx - ox, dy = ty - oy;
+            double d  = Math.hypot(dx, dy);
+            if (d > GameEnv.SISYPHUS_RADIUS) {
+                double s = GameEnv.SISYPHUS_RADIUS / d;
+                dx *= s; dy *= s;
+            }
+            double nx = ox + dx, ny = oy + dy;
+            env.tryMoveSystemRespectingConstraints(draggingSystem, nx, ny);
             repaintCallback.run();
             return;
         }
 
-        // در حال کشیدن سیم → پریویو
+        // ⚠️ مسیر «درگ سیستم معمولی» حذف/غیرفعال شد
+        // اگر لازم شد برای ادیتور، می‌تونیم با یک فلگ جدا دوباره فعالش کنیم.
+
+        // پریویو سیم
         if (startPort != null) {
             Port candidateEnd = tryFindCompatibleEmptyEndPort(e.getPoint(), startPort);
             env.setWirePreview(startPort, e.getPoint(), candidateEnd);
@@ -108,11 +119,58 @@ public class MouseHandler extends MouseAdapter {
 
     @Override
     public void mousePressed(MouseEvent e) {
+        // ========= حالت‌های Placement (از استور) =========
+        if (env.getPlacementMode() == GameEnv.PlacementMode.PLACE_AERGIA ||
+                env.getPlacementMode() == GameEnv.PlacementMode.PLACE_ELIPHAS) {
+
+            for (Wire w : env.getWires()) {
+                if (isNearWirePath(w, e.getPoint())) {
+                    env.placeField(
+                            w, e.getX(), e.getY(),
+                            (env.getPlacementMode() == GameEnv.PlacementMode.PLACE_AERGIA)
+                                    ? GameEnv.WireField.Type.AERGIA
+                                    : GameEnv.WireField.Type.ELIPHAS
+                    );
+                    repaintCallback.run();
+                    return;
+                }
+            }
+            return; // کلیک نامعتبر؛ منتظر کلیک روی سیم
+        }
+
+        // انتخاب هدفِ سیزیفوس و شروع درگِ محدود
+        if (env.getPlacementMode() == GameEnv.PlacementMode.SISYPHUS_SELECT) {
+            NetworkSystem sys = findSystemAt(e.getPoint());
+            if (sys != null && !sys.isSourceSystem()) {
+                env.beginSisyphusDrag(sys);
+                draggingSystem = sys;
+                dragOffsetX = e.getX() - (int) sys.getX();
+                dragOffsetY = e.getY() - (int) sys.getY();
+            }
+            repaintCallback.run();
+            return;
+        }
+        // اگر از قبل SISYPHUS_DRAG فعاله و کاربر دوباره روی همان سیستم کلیک کند، اجازه‌ی re-grab بدهیم
+        if (env.getPlacementMode() == GameEnv.PlacementMode.SISYPHUS_DRAG) {
+            NetworkSystem tgt = env.getSisyphusTarget();
+            if (tgt != null) {
+                Rectangle r = new Rectangle((int)tgt.getX(), (int)tgt.getY(), 120, 160);
+                if (r.contains(e.getPoint())) {
+                    draggingSystem = tgt;
+                    dragOffsetX = e.getX() - (int) tgt.getX();
+                    dragOffsetY = e.getY() - (int) tgt.getY();
+                    return;
+                }
+            }
+        }
+
+        // ====================================================
+
         Port clickedPort = findPortAt(e.getPoint());
         if (clickedPort != null) Debug.log("[CLICK]", "on " + portDesc(clickedPort));
         else Debug.log("[CLICK]", "canvas (" + e.getX() + "," + e.getY() + ")");
 
-        // --- Timeline
+        // Timeline
         int barWidth = 300, barHeight = 20;
         int barX = 1000 - barWidth - 40;
         int barY = 700 - barHeight - 40;
@@ -124,7 +182,7 @@ public class MouseHandler extends MouseAdapter {
             return;
         }
 
-        // --- حذف سریع وایر
+        // حذف سریع وایر
         if (clickedPort != null && clickedPort.getSide() == 1) {
             Wire wire = env.findWireByStartPort(clickedPort);
             if (wire != null) {
@@ -138,7 +196,7 @@ public class MouseHandler extends MouseAdapter {
             }
         }
 
-        // --- شروع کشیدن سیم
+        // شروع کشیدن سیم
         if (clickedPort != null) {
             startPort = clickedPort;
             Port candidateEnd = tryFindCompatibleEmptyEndPort(e.getPoint(), startPort);
@@ -147,8 +205,8 @@ public class MouseHandler extends MouseAdapter {
             return;
         }
 
-        // === خم‌کردن سیم
-        // 1) اول روی نودهای موجود هیت‌تست کن؛ اگر روی نودی کلیک شد، همان را برای drag انتخاب کن
+        // خم‌کردن سیم
+        // 1) درگ نود موجود
         for (Wire w : env.getWires()) {
             int n = w.getAnchorCount();
             for (int i = 0; i < n; i++) {
@@ -161,44 +219,29 @@ public class MouseHandler extends MouseAdapter {
                 }
             }
         }
-        // 2) اگر روی هیچ نودی نبودیم ولی نزدیک مسیر سیم بودیم → (فقط در صورت مجاز بودن) نود جدید بساز
+        // 2) ایجاد نود جدید فقط اگر ظرفیت کرو داریم
         for (Wire w : env.getWires()) {
             if (isNearWirePath(w, e.getPoint())) {
-                int idx = w.addAnchorAtNearest(e.getX(), e.getY()); // باید max 3 را رعایت کند
+                if (!env.consumeCurvePoint()) {
+                    Debug.log("[CURVE]", "No curve points left. Buy more in store.");
+                    return;
+                }
+                int idx = w.addAnchorAtNearest(e.getX(), e.getY()); // max 3
                 if (idx >= 0) {
                     bendingWire = w;
                     bendingAnchorIdx = idx;
+                    repaintCallback.run();
+                    return;
+                } else {
+                    // اگر نود جدید جا نشد (۳تا پر بود) ظرفیت مصرف‌شده را فعلاً برنمی‌گردانیم.
                     repaintCallback.run();
                     return;
                 }
             }
         }
 
-        // --- دکمه on/off
-        for (NetworkSystem s : env.getSystems()) {
-            if (toggleRectFor(s).contains(e.getPoint())) {
-                boolean nowEnabled = !s.isEnabled();
-                s.setEnabled(nowEnabled);
-                try {
-                    s.getClass().getMethod("setReenableTimerSec", double.class)
-                            .invoke(s, nowEnabled ? 0.0 : 5.0);
-                } catch (Exception ignore) { }
-                repaintCallback.run();
-                return;
-            }
-        }
-
-        // --- درگ سیستم (غیر از SourceSystem)
-        NetworkSystem sys = findSystemAt(e.getPoint());
-        if (sys != null) {
-            if (sys.isSourceSystem()) {
-                // جلوگیری از جابجایی سورس‌سیستم‌ها
-                return;
-            }
-            draggingSystem = sys;
-            dragOffsetX = e.getX() - (int) sys.getX();
-            dragOffsetY = e.getY() - (int) sys.getY();
-        }
+        // ⚠️ درگ آزاد سیستم‌ها اینجا حذف شد (برای جلوگیری از جابه‌جایی بدون خرید سیزیفوس)
+        // اگر حالت ادیتور لازم داری، می‌تونیم پشت فلگ جداگانه فعالش کنیم.
     }
 
     private Rectangle toggleRectFor(NetworkSystem s) {
@@ -219,13 +262,16 @@ public class MouseHandler extends MouseAdapter {
             return;
         }
 
-        // پایان درگ سیستم
-        if (draggingSystem != null) {
+        // سیزیفوس: پایان درگ خاص
+        if (env.getPlacementMode() == GameEnv.PlacementMode.SISYPHUS_DRAG) {
             draggingSystem = null;
             env.recalcWireBudget();
+            env.finishSisyphus();
             repaintCallback.run();
             return;
         }
+
+        // ⚠️ پایان درگ سیستم معمولی حذف شد (چون دیگر شروع نمی‌شود)
 
         // پایان کشیدن سیم
         if (startPort != null) {
@@ -285,7 +331,6 @@ public class MouseHandler extends MouseAdapter {
         return end;
     }
 
-    // ====== Helpers for bending ======
     private static double dist(double x1, double y1, double x2, double y2) {
         double dx = x1 - x2, dy = y1 - y2;
         return Math.hypot(dx, dy);

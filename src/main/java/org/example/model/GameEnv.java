@@ -25,7 +25,52 @@ public class GameEnv {
     private double initialWireLength;
     private int totalPacketsGenerated;
 
-    // Store
+    // ================== NEW: Store / Scrolls / Curve Points ==================
+    // ظرفیت نودهای کرو که بازیکن از استور خریده:
+    private int curvePoints = 0;
+
+    // «فیلد»‌هایی که روی سیم‌ها فعال می‌شوند (Aergia / Eliphas)
+    public static class WireField {
+        public enum Type { AERGIA, ELIPHAS }
+        public Type type;
+        public Wire wire;
+        public double x, y;
+        public double radius;
+        public double timeLeft; // sec
+    }
+    private final List<WireField> wireFields = new ArrayList<>();
+
+    // مُدهای موقتیِ «در حال کاشت/استفاده» (برای کلیک روی بورد)
+    public enum PlacementMode {
+        NONE,
+        PLACE_AERGIA,
+        PLACE_ELIPHAS,
+        SISYPHUS_SELECT,
+        SISYPHUS_DRAG
+    }
+    private PlacementMode placementMode = PlacementMode.NONE;
+
+    // سیزیفوس (درگ محدود یک سیستم)
+    private NetworkSystem sisyphusTarget = null;
+    private double sisyphusOriginX = 0, sisyphusOriginY = 0;
+
+    // کانفیگ‌ها (می‌تونی بعداً منتقلشون کنی به ModelConfig)
+    public static final double AERGIA_COST = 10.0;
+    public static final double SISYPHUS_COST = 15.0;
+    public static final double ELIPHAS_COST = 20.0;
+
+    public static final double AERGIA_DURATION = 20.0;   // ثانیه
+    public static final double ELIPHAS_DURATION = 30.0;  // ثانیه
+    public static final double AERGIA_COOLDOWN = 15.0;   // ثانیه
+    public static final double AERGIA_RADIUS = 35.0;     // px
+    public static final double ELIPHAS_RADIUS = 35.0;    // px
+
+    public static final double SISYPHUS_RADIUS = 120.0;  // شعاع مجاز جابجایی
+    private double aergiaCooldown = 0.0;
+
+    // ========================================================================
+
+    // Store (قدیمی)
     private boolean hasAtar = false;
     private boolean hasAiryaman = false;
     private boolean hasAnahita = false;
@@ -43,7 +88,7 @@ public class GameEnv {
         temporalProgress = 0;
     }
 
-    // region Abilities
+    // region Abilities (قدیمی)
     public boolean hasAtar() { return hasAtar; }
     public boolean hasAiryaman() { return hasAiryaman; }
     public boolean hasAnahita() { return hasAnahita; }
@@ -89,6 +134,15 @@ public class GameEnv {
 
     public int getTotalPacketsGenerated() { return totalPacketsGenerated; }
     public void incrementTotalPacketCount() { totalPacketsGenerated++; }
+    // NEW:
+    public int getCurvePoints() { return curvePoints; }
+    public double getAergiaCooldown() { return aergiaCooldown; }
+    public PlacementMode getPlacementMode() { return placementMode; }
+    public List<WireField> getFieldsOnWire(Wire w) {
+        ArrayList<WireField> out = new ArrayList<>();
+        for (WireField f : wireFields) if (f.wire == w) out.add(f);
+        return out;
+    }
     // endregion
 
     // region Build
@@ -96,14 +150,18 @@ public class GameEnv {
         systems.clear();
         wires.clear();
         packets.clear();
+        wireFields.clear();           // NEW: فیلدها ریست شوند
+        placementMode = PlacementMode.NONE;
+        sisyphusTarget = null;
+        aergiaCooldown = 0.0;
+        curvePoints = 0;              // ظرفیت کرو مخصوص این مرحله است
 
         remainingWireLength = stage.getInitialWireLength();
         temporalProgress = 0;
         packetLoss = 0;
-//        coins = 0;
 
         for (NetworkSystem sys : stage.getSystems()) {
-            sys.setEnv(this);          // تزریق env به سیستم‌ها
+            sys.setEnv(this);
             systems.add(sys);
             if (sys instanceof SourceSystem src) {
                 src.setEnv(this);
@@ -131,22 +189,18 @@ public class GameEnv {
         }
         lastPowerUpdateTime = currentTime;
 
+        // NEW: کاهش کول‌داون Aergia و عمر فیلدها
+        if (aergiaCooldown > 0) aergiaCooldown = Math.max(0, aergiaCooldown - delta);
+        updateWireFields(delta);
 
-        for (NetworkSystem s : systems) {
-            s.update();
-        }
+        for (NetworkSystem s : systems) s.update();
 
-
-        // تولید مثل قبل (خود سورس با isGenerating کنترل می‌کند)
         generate(delta);
 
-        // ✦ نکته اصلی: وقتی pause هستیم حرکت/سیم‌ها را آپدیت نکن
         if (!movementPaused) {
             processWires(delta);
-            cleanup();              // برخوردها و ایمپکت‌ها هم اینجا انجام می‌شوند
+            cleanup();
         }
-        // اگر خواستی، می‌تونی remove-delivered را خارج از pause نگه داری،
-        // ولی وقتی pause هستیم کسی تحویل نمی‌شود، پس فرقی نمی‌کند.
 
         if (!gameOverFired && isGameOver()) {
             gameOverFired = true;
@@ -155,6 +209,16 @@ public class GameEnv {
         }
     }
     // endregion
+
+    private void updateWireFields(double delta) {
+        Iterator<WireField> it = wireFields.iterator();
+        while (it.hasNext()) {
+            WireField f = it.next();
+            f.timeLeft -= delta;
+            if (f.timeLeft <= 0) it.remove();
+        }
+    }
+
     public boolean hasAnyWireCrossing() {
         for (Wire w : wires) {
             if (w.crossesAnySystem(this)) return true;
@@ -175,7 +239,6 @@ public class GameEnv {
         if (allpackets <= 0) return false;
         double lossPercent = (packetLoss + droppedPackets) / allpackets * 100.0;
         return lossPercent >= 50.0;
-
     }
 
     public double getTotalPacketLossPercent() {
@@ -234,13 +297,10 @@ public class GameEnv {
     }
 
     public void cleanup() {
-        // ✅ در مدل جدید تحویل توسط Wire انجام می‌شود.
-        // اگر پکتی دیگر currentPacket سیمش نیست (یا wire اش null شد) یعنی تحویل/حذف شده:
         packets.removeIf(p ->
                 p.getWire() == null || (p.getWire().getCurrentPacket() != p)
         );
 
-        // collisions (مثل قبل)
         for (int i = 0; i < packets.size(); i++) {
             Packet p1 = packets.get(i);
             for (int j = i + 1; j < packets.size(); j++) {
@@ -256,7 +316,6 @@ public class GameEnv {
             }
         }
     }
-
 
     private boolean areColliding(Packet p1, Packet p2) {
         double dx = p1.getX() - p2.getX();
@@ -290,7 +349,6 @@ public class GameEnv {
             }
         }
         for (Packet p : toRemove) markAsLost(p, "off_wire_impact");
-
     }
 
     public void markAsLost(Packet p) {
@@ -308,9 +366,8 @@ public class GameEnv {
         if (p == null) return;
         Debug.log("[LOSS]", Debug.p(p) + (reason==null? "" : " reason=" + reason) +
                 " wire=" + (p.getWire()==null? "-" : Debug.wire(p.getWire())));
-        markAsLost(p); // متد اصلی موجود
+        markAsLost(p);
     }
-
     // endregion
 
     public void addWire(Wire wire) { wires.add(wire); }
@@ -340,6 +397,11 @@ public class GameEnv {
             if (sys instanceof SourceSystem src) src.reset();
             else sys.getPacketStorage().clear();
         }
+        wireFields.clear();
+        placementMode = PlacementMode.NONE;
+        sisyphusTarget = null;
+        aergiaCooldown = 0;
+        curvePoints = 0;
     }
 
     public void simulateFastForward(double targetPercent) {
@@ -368,6 +430,97 @@ public class GameEnv {
         }
     }
 
+    // ======= NEW: خرید «نقطه‌ی کرو» =======
+    public boolean buyCurvePoint() {
+        if (coins >= 1) {
+            coins -= 1;
+            curvePoints += 1;
+            return true;
+        }
+        return false;
+    }
+    public boolean consumeCurvePoint() {
+        if (curvePoints > 0) { curvePoints--; return true; }
+        return false;
+    }
+
+    // ======= NEW: شروع/انجام کاشت فیلدهای Aergia/Eliphas =======
+    public boolean tryStartAergiaPlacement() {
+        if (coins >= AERGIA_COST && aergiaCooldown <= 0) {
+            coins -= (int)AERGIA_COST;
+            placementMode = PlacementMode.PLACE_AERGIA;
+            return true;
+        }
+        return false;
+    }
+    public boolean tryStartEliphasPlacement() {
+        if (coins >= ELIPHAS_COST) {
+            coins -= (int)ELIPHAS_COST;
+            placementMode = PlacementMode.PLACE_ELIPHAS;
+            return true;
+        }
+        return false;
+    }
+
+    public void placeField(Wire wire, double x, double y, WireField.Type type) {
+        WireField f = new WireField();
+        f.type = type;
+        f.wire = wire;
+        f.x = x; f.y = y;
+        if (type == WireField.Type.AERGIA) {
+            f.radius = AERGIA_RADIUS;
+            f.timeLeft = AERGIA_DURATION;
+            aergiaCooldown = AERGIA_COOLDOWN;
+        } else {
+            f.radius = ELIPHAS_RADIUS;
+            f.timeLeft = ELIPHAS_DURATION;
+        }
+        wireFields.add(f);
+        placementMode = PlacementMode.NONE;
+    }
+
+    public void cancelPlacement() { placementMode = PlacementMode.NONE; }
+
+    // ======= NEW: Sisyphus – جابجایی محدود سیستم =======
+    public boolean tryStartSisyphus() {
+        if (coins >= SISYPHUS_COST) {
+            coins -= (int)SISYPHUS_COST;
+            placementMode = PlacementMode.SISYPHUS_SELECT;
+            sisyphusTarget = null;
+            return true;
+        }
+        return false;
+    }
+    public void beginSisyphusDrag(NetworkSystem s) {
+        sisyphusTarget = s;
+        sisyphusOriginX = s.getX();
+        sisyphusOriginY = s.getY();
+        placementMode = PlacementMode.SISYPHUS_DRAG;
+    }
+    public boolean isSisyphusDragActive() {
+        return placementMode == PlacementMode.SISYPHUS_DRAG && sisyphusTarget != null;
+    }
+    public double getSisyphusOriginX() { return sisyphusOriginX; }
+    public double getSisyphusOriginY() { return sisyphusOriginY; }
+    public NetworkSystem getSisyphusTarget() { return sisyphusTarget; }
+
+    /** تلاش برای جابجایی با رعایت محدودیت طول سیم و عدم عبور سیم‌ها از بدنه سیستم‌ها */
+    public boolean tryMoveSystemRespectingConstraints(NetworkSystem sys, double newX, double newY) {
+        double oldX = sys.getX(), oldY = sys.getY();
+        moveSystem(sys, newX, newY);
+        boolean invalid = isOverBudget() || hasAnyWireCrossing();
+        if (invalid) {
+            moveSystem(sys, oldX, oldY); // rollback
+            return false;
+        }
+        return true;
+    }
+
+    public void finishSisyphus() {
+        placementMode = PlacementMode.NONE;
+        sisyphusTarget = null;
+    }
+
     // داخل کلاس GameEnv
     private boolean movementPaused = false;
 
@@ -387,7 +540,7 @@ public class GameEnv {
     public void recalcWireBudget() {
         double used = 0.0;
         for (Wire w : wires) used += w.getLength();
-        remainingWireLength = initialWireLength - used;  // ممکن است منفی شود (over)
+        remainingWireLength = initialWireLength - used;
         overBudget = (remainingWireLength < 0);
     }
 
@@ -397,10 +550,8 @@ public class GameEnv {
         double dy = newY - sys.getY();
         sys.setX(newX);
         sys.setY(newY);
-        // شیفت دادن مختصات پورت‌ها
         for (Port p : sys.getInputPorts())  p.translate(dx, dy);
         for (Port p : sys.getOutputPorts()) p.translate(dx, dy);
-        // حالا طول‌ سیم‌ها از روی پورت‌ها تغییر می‌کند → بودجه را مجدداً حساب کن
         recalcWireBudget();
     }
 
@@ -408,7 +559,6 @@ public class GameEnv {
     private Point previewMouse     = null;
     private Port  previewEndPort   = null; // اگر روی پورت compatible هستیم
 
-    // GameEnv.java  (افزودن getter/setter ها)
     public void setWirePreview(Port start, Point mouse, Port end) {
         this.previewStartPort = start;
         this.previewMouse = mouse;
@@ -422,6 +572,4 @@ public class GameEnv {
     public Port  getPreviewStartPort() { return previewStartPort; }
     public Point getPreviewMousePoint(){ return previewMouse; }
     public Port  getPreviewEndPort()   { return previewEndPort; }
-
-
 }
