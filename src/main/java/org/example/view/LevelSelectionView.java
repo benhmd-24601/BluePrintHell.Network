@@ -1,6 +1,6 @@
 package org.example.view;
 
-import org.example.util.SaveManager;
+import org.example.util.SaveLoadManager;
 
 import javax.swing.*;
 import java.awt.*;
@@ -22,9 +22,9 @@ public class LevelSelectionView extends JPanel {
         Font customFont = new Font("Arial", Font.BOLD, 26);
 
         level1Button = createStyledButton(" Level 1", customFont, Color.BLACK);
-        level1Button.setEnabled(SaveManager.isUnlocked(0));
+        level1Button.setEnabled(SaveLoadManager.isUnlocked(0));
         level2Button = createStyledButton(" Level 2", customFont, Color.BLACK);
-        level2Button.setEnabled(SaveManager.isUnlocked(1));
+        level2Button.setEnabled(SaveLoadManager.isUnlocked(1));
         backButton = createStyledButton(" Back to Menu", customFont, Color.DARK_GRAY);
 
         addComponent(gbc, level1Button, 0);

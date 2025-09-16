@@ -1,6 +1,7 @@
 package org.example.view;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionListener;
 
@@ -10,21 +11,23 @@ public class StoreView extends JPanel {
 
     // NEW:
     private JButton aergiaBtn, eliphasBtn, sisyphusBtn, curvePointBtn;
-    private JLabel  curvePointLabel;
+    private JLabel curvePointLabel;
 
     private static final int SQUARE = 40;
 
     public StoreView(int coins, boolean hasAtar, boolean hasAiryaman, boolean hasAnahita) {
         setOpaque(false);
         setLayout(new GridBagLayout());
+        setBorder(new EmptyBorder(12, 12, 12, 12));
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10,10,10,10);
+        gbc.insets = new Insets(10, 10, 10, 10);
         gbc.gridx = 0;
 
         coinsLabel = new JLabel("Coins: " + coins);
         coinsLabel.setFont(new Font("Consolas", Font.BOLD, 24));
         coinsLabel.setForeground(Color.WHITE);
-        gbc.gridy = 0; gbc.gridwidth = 2;
+        gbc.gridy = 0;
+        gbc.gridwidth = 2;
         add(coinsLabel, gbc);
         gbc.gridwidth = 1;
 
@@ -64,7 +67,7 @@ public class StoreView extends JPanel {
         gbc.gridy = 6;
         add(createPlainPanel(sisyphusBtn, "Move one non-source system within radius"), gbc);
 
-        JPanel curvePanel = new JPanel(new BorderLayout(10,0));
+        JPanel curvePanel = new JPanel(new BorderLayout(10, 0));
         curvePanel.setOpaque(false);
         curvePointBtn = new JButton("Buy Curve Point (1)");
         curvePointBtn.setFont(f);
@@ -79,12 +82,12 @@ public class StoreView extends JPanel {
 
         JTextArea help = new JTextArea(
                 """
-                روش استفادهٔ ابزارها:
-                • Shift + کلیک نزدیک سیم → افزودن نقطهٔ کرو (از Curve Points مصرف می‌شود)
-                • Ctrl  + کلیک روی سیم   → Scroll of Aergia (شتاب صفر؛ 20s؛ کول‌داون دارد؛ 10 کوین)
-                • Alt   + کلیک روی سیم   → Scroll of Eliphas (بازگردانی مرکز ثقل؛ 30s؛ 20 کوین)
-                • Shift نگه‌دار + کلیک روی سیستم غیرمرجع و درگ → Sisyphus (15 کوین؛ شعاع محدود و بدون نقض قیود)
-                """
+                        روش استفادهٔ ابزارها:
+                        • Shift + کلیک نزدیک سیم → افزودن نقطهٔ کرو (از Curve Points مصرف می‌شود)
+                        • Ctrl  + کلیک روی سیم   → Scroll of Aergia (شتاب صفر؛ 20s؛ کول‌داون دارد؛ 10 کوین)
+                        • Alt   + کلیک روی سیم   → Scroll of Eliphas (بازگردانی مرکز ثقل؛ 30s؛ 20 کوین)
+                        • Shift نگه‌دار + کلیک روی سیستم غیرمرجع و درگ → Sisyphus (15 کوین؛ شعاع محدود و بدون نقض قیود)
+                        """
         );
         help.setFont(new Font("Vazirmatn", Font.PLAIN, 13));
         help.setForeground(Color.WHITE);
@@ -93,18 +96,21 @@ public class StoreView extends JPanel {
         help.setLineWrap(true);
         help.setWrapStyleWord(true);
         GridBagConstraints gbc1 = new GridBagConstraints();
-        gbc1.gridx = 0; gbc1.gridy = 8; gbc1.insets = new Insets(10,10,10,10);
-        gbc1.fill = GridBagConstraints.HORIZONTAL; gbc1.weightx = 1.0;
+        gbc1.gridx = 0;
+        gbc1.gridy = 8;
+        gbc1.insets = new Insets(10, 10, 10, 10);
+        gbc1.fill = GridBagConstraints.HORIZONTAL;
+        gbc1.weightx = 1.0;
         add(help, gbc1);
 
         backBtn = new JButton("Back");
         backBtn.setFont(f);
-        gbc1.gridy = 8;
+        gbc1.gridy = 9;
         add(backBtn, gbc1);
     }
 
     private JPanel createAbilityPanel(String name, int cost, JButton buyBtn, boolean owned) {
-        JPanel p = new JPanel(new BorderLayout(10,0));
+        JPanel p = new JPanel(new BorderLayout(10, 0));
         p.setOpaque(false);
         JLabel lbl = new JLabel(name);
         lbl.setFont(new Font("Arial", Font.BOLD, 20));
@@ -115,27 +121,49 @@ public class StoreView extends JPanel {
     }
 
     private JPanel createPlainPanel(JButton btn, String hint) {
-        JPanel p = new JPanel(new BorderLayout(10,0));
+        JPanel p = new JPanel(new BorderLayout(10, 0));
         p.setOpaque(false);
         JLabel lbl = new JLabel(hint);
         lbl.setFont(new Font("Arial", Font.PLAIN, 14));
-        lbl.setForeground(new Color(220,220,220));
+        lbl.setForeground(new Color(220, 220, 220));
         p.add(lbl, BorderLayout.WEST);
         p.add(btn, BorderLayout.EAST);
         return p;
     }
 
     // قبلی
-    public void setAtarBuyListener(ActionListener listener) { atarBuy.addActionListener(listener); }
-    public void setAiryamanBuyListener(ActionListener listener) { airyamanBuy.addActionListener(listener); }
-    public void setAnahitaBuyListener(ActionListener listener) { anahitaBuy.addActionListener(listener); }
-    public void setBackListener(ActionListener listener) { backBtn.addActionListener(listener); }
+    public void setAtarBuyListener(ActionListener listener) {
+        atarBuy.addActionListener(listener);
+    }
+
+    public void setAiryamanBuyListener(ActionListener listener) {
+        airyamanBuy.addActionListener(listener);
+    }
+
+    public void setAnahitaBuyListener(ActionListener listener) {
+        anahitaBuy.addActionListener(listener);
+    }
+
+    public void setBackListener(ActionListener listener) {
+        backBtn.addActionListener(listener);
+    }
 
     // NEW: لیسنرهای اسکرول‌ها و نقطه‌ی کرو
-    public void setAergiaListener(ActionListener l) { aergiaBtn.addActionListener(l); }
-    public void setEliphasListener(ActionListener l) { eliphasBtn.addActionListener(l); }
-    public void setSisyphusListener(ActionListener l) { sisyphusBtn.addActionListener(l); }
-    public void setCurvePointListener(ActionListener l) { curvePointBtn.addActionListener(l); }
+    public void setAergiaListener(ActionListener l) {
+        aergiaBtn.addActionListener(l);
+    }
+
+    public void setEliphasListener(ActionListener l) {
+        eliphasBtn.addActionListener(l);
+    }
+
+    public void setSisyphusListener(ActionListener l) {
+        sisyphusBtn.addActionListener(l);
+    }
+
+    public void setCurvePointListener(ActionListener l) {
+        curvePointBtn.addActionListener(l);
+    }
 
     // قبلی (برای سه قابلیت قدیمی)
     public void updateState(int coins, boolean hasAtar, boolean hasAiryaman, boolean hasAnahita) {
@@ -143,17 +171,17 @@ public class StoreView extends JPanel {
 
         atarBuy.setText(hasAtar ? "Purchased" : "Buy (3)");
         atarBuy.setEnabled(!hasAtar && coins >= 3);
-        ((JLabel)((JPanel)getComponent(1)).getComponent(0))
+        ((JLabel) ((JPanel) getComponent(1)).getComponent(0))
                 .setForeground(hasAtar ? Color.WHITE : Color.GRAY);
 
         airyamanBuy.setText(hasAiryaman ? "Purchased" : "Buy (4)");
         airyamanBuy.setEnabled(!hasAiryaman && coins >= 4);
-        ((JLabel)((JPanel)getComponent(2)).getComponent(0))
+        ((JLabel) ((JPanel) getComponent(2)).getComponent(0))
                 .setForeground(hasAiryaman ? Color.WHITE : Color.GRAY);
 
         anahitaBuy.setText(hasAnahita ? "Purchased" : "Buy (5)");
         anahitaBuy.setEnabled(!hasAnahita && coins >= 5);
-        ((JLabel)((JPanel)getComponent(3)).getComponent(0))
+        ((JLabel) ((JPanel) getComponent(3)).getComponent(0))
                 .setForeground(hasAnahita ? Color.WHITE : Color.GRAY);
     }
 
@@ -179,7 +207,7 @@ public class StoreView extends JPanel {
         for (int y = 0; y < getHeight(); y += SQUARE) {
             for (int x = 0; x < getWidth(); x += SQUARE) {
                 boolean dark = ((x / SQUARE) + (y / SQUARE)) % 2 == 0;
-                g2.setColor(dark? new Color(40,40,40) : new Color(60,60,60));
+                g2.setColor(dark ? new Color(40, 40, 40) : new Color(60, 60, 60));
                 g2.fillRect(x, y, SQUARE, SQUARE);
             }
         }

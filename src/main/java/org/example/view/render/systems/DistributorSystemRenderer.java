@@ -13,7 +13,7 @@ public class DistributorSystemRenderer extends BaseSystemRenderer<DistributorSys
         super.paint(s, g2, ctx);
         g2.setColor(Color.WHITE);
         g2.setFont(new Font("Consolas", Font.BOLD, 12));
-        g2.drawString("DIST", (int)s.getX() + 44, (int)s.getY() + 22);
+        g2.drawString("DIST", (int)s.getX() + 60, (int)s.getY() + 17);
         //paintStorage(g2 ,s);
     }
 }

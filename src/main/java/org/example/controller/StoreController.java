@@ -1,24 +1,28 @@
+// StoreController.java
 package org.example.controller;
 
 import org.example.model.GameEnv;
 import org.example.view.StoreView;
 
 import javax.swing.*;
+import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 
 public class StoreController {
     private final GameEnv env;
     private final StoreView view;
-    private final JFrame frame;
+    private final JDialog dialog;           // ← به‌جای JFrame
     private final Runnable onCloseCallback;
+    private final JFrame parent;
+
+    private boolean open = false;           // ← گارد
+    private final Timer refreshTimer;       // ← برای آپدیت کول‌داون/سکه‌ها
 
     public StoreController(GameEnv env, JFrame parentFrame, Runnable onCloseCallback) {
         this.env = env;
         this.onCloseCallback = onCloseCallback;
-
-        frame = new JFrame("Store");
-        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        frame.setSize(480, 520);
-        frame.setLocationRelativeTo(parentFrame);
+        this.parent = parentFrame;
 
         view = new StoreView(
                 env.getCoins(),
@@ -27,16 +31,33 @@ public class StoreController {
                 env.hasAnahita()
         );
 
-        setupListeners();
-        frame.setContentPane(view);
+        dialog = new JDialog(parentFrame, "Store", Dialog.ModalityType.MODELESS);
+        dialog.setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE); // فقط hide شود
+        dialog.setSize(600, 700);
+        dialog.setLocationRelativeTo(parentFrame);
+        dialog.setContentPane(view);
 
-        // وضعیت اولیه دکمه‌های جدید
+        // باز/بسته بودن را با لایف‌سایکل همگام کن
+        dialog.addWindowListener(new WindowAdapter() {
+            @Override public void windowOpened(WindowEvent e)  { open = true; }
+            @Override public void windowClosing(WindowEvent e) { open = false; }
+            @Override public void windowClosed(WindowEvent e)  { open = false; }
+        });
+
+        setupListeners();
+
+        // تایمر سبک برای به‌روز نگه‌داشتن نوشته‌های استور (کول‌داون، سکه، Curve Points)
+        refreshTimer = new Timer(250, e ->
+                view.updateScrollsState(env.getCoins(), env.getAergiaCooldown(), env.getCurvePoints())
+        );
+        refreshTimer.setRepeats(true);
+
+        // وضعیت اولیه
         view.updateScrollsState(env.getCoins(), env.getAergiaCooldown(), env.getCurvePoints());
     }
 
-
     private void setupListeners() {
-        // قدیمی‌ها
+        // خریدهای قدیمی
         view.setAtarBuyListener(e -> {
             if (env.canBuyAtar()) env.buyAtar();
             view.updateState(env.getCoins(), env.hasAtar(), env.hasAiryaman(), env.hasAnahita());
@@ -52,39 +73,60 @@ public class StoreController {
             view.updateState(env.getCoins(), env.hasAtar(), env.hasAiryaman(), env.hasAnahita());
             view.updateScrollsState(env.getCoins(), env.getAergiaCooldown(), env.getCurvePoints());
         });
-        view.setBackListener(e -> closeStore());
 
-        // NEW: Scrolls → فقط راهنما
-        view.setAergiaListener(e ->
-                JOptionPane.showMessageDialog(frame,
-                        "Aergia: Ctrl + کلیک روی سیم.\nهزینه: 10 کوین، مدت: 20s، کول‌داون دارد.",
-                        "Scroll of Aergia", JOptionPane.INFORMATION_MESSAGE)
-        );
-        view.setEliphasListener(e ->
-                JOptionPane.showMessageDialog(frame,
-                        "Eliphas: Alt + کلیک روی سیم.\nهزینه: 20 کوین، مدت: 30s.",
-                        "Scroll of Eliphas", JOptionPane.INFORMATION_MESSAGE)
-        );
-        view.setSisyphusListener(e ->
-                JOptionPane.showMessageDialog(frame,
-                        "Sisyphus: Shift را نگه دارید، روی سیستم غیرمرجع کلیک کرده و درگ کنید.\nهزینه: 15 کوین، شعاع جابه‌جایی محدود.",
-                        "Scroll of Sisyphus", JOptionPane.INFORMATION_MESSAGE)
-        );
+        // راهنمای اسکرول‌ها (کلیدهای میانبر)
+        view.setAergiaListener(e -> JOptionPane.showMessageDialog(dialog,
+                "Aergia: Ctrl + کلیک روی سیم\nهزینه: 10 کوین | مدت: 20s | کول‌داون دارد",
+                "Scroll of Aergia", JOptionPane.INFORMATION_MESSAGE));
+        view.setEliphasListener(e -> JOptionPane.showMessageDialog(dialog,
+                "Eliphas: Alt + کلیک روی سیم\nهزینه: 20 کوین | مدت: 30s",
+                "Scroll of Eliphas", JOptionPane.INFORMATION_MESSAGE));
+        view.setSisyphusListener(e -> JOptionPane.showMessageDialog(dialog,
+                "Sisyphus: Shift نگه‌دار + کلیک روی سیستم غیرمرجع و درگ\nهزینه: 15 کوین | شعاع محدود | بدون نقض بودجه/برخورد",
+                "Scroll of Sisyphus", JOptionPane.INFORMATION_MESSAGE));
 
-        // خرید ظرفیت کرو
+        // خرید Curve Point
         view.setCurvePointListener(e -> {
             if (env.buyCurvePoint()) {
                 view.updateScrollsState(env.getCoins(), env.getAergiaCooldown(), env.getCurvePoints());
             }
         });
-    }
 
-    private void closeStore() {
-        frame.dispose();
-        if (onCloseCallback != null) onCloseCallback.run();
+        // بستن
+        view.setBackListener(e -> closeStore());
     }
 
     public void show() {
-        frame.setVisible(true);
+        // اگر باز است، فقط بیا جلو
+        if (dialog.isShowing() || open) {
+            dialog.toFront();
+            dialog.requestFocus();
+            return;
+        }
+        open = true;
+        SwingUtilities.invokeLater(() -> {
+            dialog.setLocationRelativeTo(parent);
+            dialog.setVisible(true);   // روی بازی و بدون تغییر CardLayout
+            dialog.toFront();
+            dialog.requestFocus();
+            refreshTimer.start();      // شروع آپدیت
+        });
+    }
+
+    private void closeStore() {
+        if (!open) return;
+        open = false;
+        refreshTimer.stop();
+        dialog.setVisible(false);      // فقط hide (نه dispose)
+        if (onCloseCallback != null) onCloseCallback.run();
+        if (parent != null) parent.toFront();
+    }
+
+    public boolean isOpen() { return open; }
+
+    // در صورت نیاز هنگام پایان لِول:
+    public void dispose() {
+        refreshTimer.stop();
+        dialog.dispose();
     }
 }

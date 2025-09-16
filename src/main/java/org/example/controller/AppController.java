@@ -1,9 +1,8 @@
 package org.example.controller;
 
 import org.example.model.GameOverModel;
-import org.example.util.SaveManager;
+import org.example.util.SaveLoadManager;
 import org.example.util.SoundManager;
-import org.example.util.UiUtil;
 import org.example.view.GameOverView;
 import org.example.view.LevelSelectionView;
 import org.example.view.MainMenuView;
@@ -31,7 +30,7 @@ public class AppController {
 
     public AppController() {
         SoundManager.init();
-        SaveManager.init(2);
+        SaveLoadManager.init(2);
 
         frame = new JFrame("Blueprint Hell Swing - MVC");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -50,7 +49,10 @@ public class AppController {
         root.add(settingsMenu, "settings");
 
         frame.setContentPane(root);
-        UiUtil.fullscreen(frame);
+//        UiUtil.fullscreen(frame);
+        frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+        frame.setUndecorated(true);    // بدون نوار عنوان و قاب
+        frame.setResizable(false);
 
     }
 
