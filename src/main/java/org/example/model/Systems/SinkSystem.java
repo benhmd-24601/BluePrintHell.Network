@@ -27,6 +27,7 @@ public class SinkSystem extends NetworkSystem {
         GameEnv env = getEnv();
 
         if (packet instanceof BitPacket bp) {
+            receivedPackets.add(packet);
             // طبق خواسته‌ی تو: رسیدن «بیت‌پکت» به سینک → یک جریمه‌ی ویژه
             // فرمول ارائه‌شده: N - N * N^(1/N)  (توجه: این مقدار منفی می‌شود)
             double loss = lossFromBitArrival(bp.getBulkSize());

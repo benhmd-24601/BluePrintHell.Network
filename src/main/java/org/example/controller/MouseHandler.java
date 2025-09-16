@@ -188,13 +188,16 @@ public class MouseHandler extends MouseAdapter {
             }
         }
 
-        // --- درگ سیستم
+        // --- درگ سیستم (غیر از SourceSystem)
         NetworkSystem sys = findSystemAt(e.getPoint());
         if (sys != null) {
+            if (sys.isSourceSystem()) {
+                // جلوگیری از جابجایی سورس‌سیستم‌ها
+                return;
+            }
             draggingSystem = sys;
             dragOffsetX = e.getX() - (int) sys.getX();
             dragOffsetY = e.getY() - (int) sys.getY();
-            return;
         }
     }
 
