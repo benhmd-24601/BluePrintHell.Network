@@ -1,3 +1,4 @@
+
 package org.example.model;
 
 import org.example.model.Packet.Packet;
@@ -5,6 +6,7 @@ import org.example.model.Systems.NetworkSystem;
 import org.example.model.Systems.SinkSystem;
 import org.example.model.Systems.SourceSystem;
 import org.example.util.Debug;
+import org.example.util.SaveLoadManager;
 
 import javax.swing.*;
 import java.util.*;
@@ -206,11 +208,18 @@ public class GameEnv {
             cleanup();
         }
 
+        SaveLoadManager.maybeAutosave(this);
+
         if (!gameOverFired && isGameOver()) {
             gameOverFired = true;
             if (onGameOver != null) SwingUtilities.invokeLater(onGameOver);
             return;
         }
+        if (gameisWon()) {
+            // توجه: اگر شماره مراحل شما 1-based است:
+            SaveLoadManager.markPassed(getLevelNumber() - 1);
+        }
+
     }
     // endregion
 
@@ -574,4 +583,34 @@ public class GameEnv {
     public Port  getPreviewStartPort() { return previewStartPort; }
     public Point getPreviewMousePoint(){ return previewMouse; }
     public Port  getPreviewEndPort()   { return previewEndPort; }
+
+    //-----------------------------Save Load Section
+
+    public int getLevelNumber() { return levelNumber; }
+
+    // — اگر getter/settter تایمرها ندارید، این debug-accessor ها را اضافه کنید:
+    public double __debug_getAtarTimer() { return atarTimer; }
+    public double __debug_getAiryTimer() { return airyTimer; }
+    public void __debug_setAtarTimer(double v) { atarTimer = Math.max(0, v); activeAtar = v > 0; }
+    public void __debug_setAiryTimer(double v) { airyTimer = Math.max(0, v); activeAiryaman = v > 0; }
+
+    public void __debug_setAergiaCooldown(double v) { aergiaCooldown = Math.max(0, v); }
+    public void __debug_setCurvePoints(int v) { this.curvePoints = Math.max(0, v); }
+
+    /** افزودن فیلد از سیو (بدون کم‌کردن کوین/کول‌داون دستکاری‌شده) */
+    public void __debug_addFieldDirect(Wire wire, WireField.Type type, double x, double y, double radius, long endAtMs) {
+        WireField f = new WireField();
+        f.type = type;
+        f.wire = wire;
+        f.x = x; f.y = y;
+        f.radius = radius;
+        f.endAtMs = endAtMs;
+        wireFields.add(f);
+    }
+
 }
+
+
+
+
+

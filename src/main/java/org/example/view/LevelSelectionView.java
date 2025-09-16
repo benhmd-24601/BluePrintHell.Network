@@ -7,7 +7,7 @@ import java.awt.*;
 import java.awt.event.ActionListener;
 
 public class LevelSelectionView extends JPanel {
-    private final JButton level1Button, level2Button, backButton;
+    private final JButton level1Button, level2Button, level3Button, level4Button, level5Button, backButton;
     private final Image backgroundImage;
 
     public LevelSelectionView() {
@@ -23,13 +23,27 @@ public class LevelSelectionView extends JPanel {
 
         level1Button = createStyledButton(" Level 1", customFont, Color.BLACK);
         level1Button.setEnabled(SaveLoadManager.isUnlocked(0));
+
         level2Button = createStyledButton(" Level 2", customFont, Color.BLACK);
         level2Button.setEnabled(SaveLoadManager.isUnlocked(1));
+
+        level3Button = createStyledButton(" Level 3", customFont, Color.BLACK);
+        level3Button.setEnabled(SaveLoadManager.isUnlocked(2));
+
+        level4Button = createStyledButton(" Level 4", customFont, Color.BLACK);
+        level4Button.setEnabled(SaveLoadManager.isUnlocked(3));
+
+        level5Button = createStyledButton(" Level 5", customFont, Color.BLACK);
+        level5Button.setEnabled(SaveLoadManager.isUnlocked(4));
+
         backButton = createStyledButton(" Back to Menu", customFont, Color.DARK_GRAY);
 
         addComponent(gbc, level1Button, 0);
         addComponent(gbc, level2Button, 1);
-        addComponent(gbc, backButton, 2);
+        addComponent(gbc, level3Button, 2);
+        addComponent(gbc, level4Button, 3);
+        addComponent(gbc, level5Button, 4);
+        addComponent(gbc, backButton,   5);
     }
 
     private JButton createStyledButton(String text, Font font, Color bg) {
@@ -65,5 +79,16 @@ public class LevelSelectionView extends JPanel {
 
     public void addLevel1Listener(ActionListener l) { level1Button.addActionListener(l); }
     public void addLevel2Listener(ActionListener l) { level2Button.addActionListener(l); }
-    public void addBackListener(ActionListener l) { backButton.addActionListener(l); }
+    public void addLevel3Listener(ActionListener l) { level3Button.addActionListener(l); }
+    public void addLevel4Listener(ActionListener l) { level4Button.addActionListener(l); }
+    public void addLevel5Listener(ActionListener l) { level5Button.addActionListener(l); }
+    public void addBackListener(ActionListener l)   { backButton.addActionListener(l); }
+
+    public void refreshLocks() {
+        level1Button.setEnabled(SaveLoadManager.isUnlocked(0)); // همیشه true اما هم‌سو با منطق کلی
+        level2Button.setEnabled(SaveLoadManager.isUnlocked(1));
+        level3Button.setEnabled(SaveLoadManager.isUnlocked(2));
+        level4Button.setEnabled(SaveLoadManager.isUnlocked(3));
+        level5Button.setEnabled(SaveLoadManager.isUnlocked(4));
+    }
 }

@@ -73,6 +73,11 @@ public class NetworkSystem {
             inputPorts.add(new Port("circle" , -1 , this , x - 15 , y + 3 * spacing  ,true));
             outputPorts.add(new Port("circle" , 1 , this , x  +120 , y + 3 * spacing  ,true));
 
+        } else if (type == 8){
+            inputPorts.add(new Port("square" , -1 , this , x  +120 , y + 3 * spacing  ,true));
+            outputPorts.add(new Port("square" , 1 , this , x  +120 , y + 3 * spacing  ,true));
+            inputPorts.add(new Port("circle" , -1 , this , x - 15 , y + 3 * spacing  ,true));
+
         }
 
         this.x = x - 6;

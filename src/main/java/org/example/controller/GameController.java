@@ -3,9 +3,8 @@ package org.example.controller;
 import org.example.model.*;
 import org.example.model.Systems.NetworkSystem;
 import org.example.model.Systems.SourceSystem;
+import org.example.util.SaveLoadManager;
 import org.example.util.SoundManager;
-import org.example.view.GameOverView;
-import org.example.view.GameOverView;
 import org.example.view.GameView;
 
 import javax.swing.*;
@@ -22,12 +21,10 @@ public class GameController {
     private final GameView gameView;
     private final GameLoop gameLoop;
 
-    // فیلدهای جدید برای مدیریت دکمه‌های قدرت
     private JToggleButton atarToggle;
     private JToggleButton airyToggle;
     private JToggleButton anaToggle;
     private JPanel powerBar;
-
 
     public GameController(AppController app, int levelNumber) {
         this.app = app;
@@ -38,8 +35,12 @@ public class GameController {
         Stage stage = switch (levelNumber) {
             case 1 -> StageFactory.createStage1();
             case 2 -> StageFactory.createStage2();
+            case 3 -> StageFactory.createStage3();
+            case 4 -> StageFactory.createStage4();
+            case 5 -> StageFactory.createStage5();
             default -> throw new IllegalArgumentException("Unknown level: " + levelNumber);
         };
+
         env.applyStage(stage);
 
         // View
@@ -58,20 +59,15 @@ public class GameController {
         createBackButton();
 
         createStoreButton();
-        // ساخت دکمه‌های قدرت
         createPowerButtons();
-
         createSourceButtons();
 
-        // Key binding: toggle mute (Controller owns input)
+        // Key binding: toggle mute
         JComponent content = app.getFrame().getRootPane();
         content.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
                 .put(KeyStroke.getKeyStroke(SoundManager.InputSettings.getMuteKey(), 0), "toggleMute");
         content.getActionMap().put("toggleMute", new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                SoundManager.toggleMute();
-            }
+            @Override public void actionPerformed(ActionEvent e) { SoundManager.toggleMute(); }
         });
 
         // Game loop
@@ -81,10 +77,8 @@ public class GameController {
         // Game over callback
         env.setOnGameOver(this::showGameOver);
 
-        // start
         gameLoop.start();
     }
-
 
     private void createBackButton() {
         JButton backButton = new JButton("⏎ Menu");
@@ -104,46 +98,36 @@ public class GameController {
                 JButton btn = new JButton("◀");
                 btn.setBounds((int) src.getX(), (int) src.getY() - 25, 60, 20);
                 styleHudButton(btn);
-
-                // مدیریت رویداد کلیک
                 btn.addActionListener(e -> handleSourceButtonClick(src, btn));
-
                 gameView.addCustomComponent(btn);
             }
-
         }
     }
 
     private void handleSourceButtonClick(SourceSystem source, JButton button) {
-        // 1) آیا همه‌ی سیستم‌ها متصل‌اند؟ (همون منطق قبلی خودت)
+        // همه‌ی سیستم‌ها باید متصل باشند
         boolean allConnected = true;
         for (NetworkSystem system : env.getSystems()) {
-            if (!system.isSourceSystem() && !system.isIndicatorOn()) {
-                allConnected = false;
-                break;
-            }
+            if (!system.isSourceSystem() && !system.isIndicatorOn()) { allConnected = false; break; }
         }
         if (!allConnected) return;
 
-        // 2) Play ⇄ Pause
-        boolean nextRunning = !source.isGenerating(); // مثل قبل تولید سورس را هم toggle کنیم
+        // Play ⇄ Pause
+        boolean nextRunning = !source.isGenerating();
         source.setGenerating(nextRunning);
-
-        // ✦ نکته اصلی: حرکت سراسری را هم با همان دکمه pause/resume کنیم
         env.setMovementPaused(!nextRunning);
 
-        // 3) UI
-        button.setText(nextRunning ? "❚❚" : "◀"); // در حال اجرا = pause icon، در حال توقف = play icon
+        // سیو فوری حالت (برای ادامهٔ دقیق بعد از Load)
+        SaveLoadManager.saveLevelNow(env);
+
+        button.setText(nextRunning ? "❚❚" : "◀");
     }
 
-
     private void createPowerButtons() {
-        // ساخت پنل نوار قدرت
         powerBar = new JPanel(new FlowLayout(FlowLayout.LEADING, 20, 5));
         powerBar.setOpaque(false);
         powerBar.setBounds(0, gameView.getHeight() - 50, gameView.getWidth(), 50);
 
-        // ساخت دکمه‌های قدرت
         atarToggle = new JToggleButton("Atar");
         airyToggle = new JToggleButton("Airyaman");
         anaToggle = new JToggleButton("Anahita");
@@ -155,14 +139,12 @@ public class GameController {
         refreshPowerButtons();
 
         atarToggle.addActionListener(ev -> {
-            if (atarToggle.isSelected()) env.activateAtar();
-            else env.setActiveAtar(false);
+            if (atarToggle.isSelected()) env.activateAtar(); else env.setActiveAtar(false);
             refreshPowerButtons();
         });
 
         airyToggle.addActionListener(ev -> {
-            if (airyToggle.isSelected()) env.activateAiryaman();
-            else env.setActiveAiryaman(false);
+            if (airyToggle.isSelected()) env.activateAiryaman(); else env.setActiveAiryaman(false);
             refreshPowerButtons();
         });
 
@@ -181,10 +163,8 @@ public class GameController {
 
         gameView.addCustomComponent(powerBar);
 
-        // افزودن لیستنر برای تغییر سایز
         gameView.addComponentListener(new ComponentAdapter() {
-            @Override
-            public void componentResized(ComponentEvent e) {
+            @Override public void componentResized(ComponentEvent e) {
                 powerBar.setBounds(0, gameView.getHeight() - 50, gameView.getWidth(), 50);
             }
         });
@@ -196,7 +176,6 @@ public class GameController {
         b.setFocusPainted(false);
         b.setBorder(BorderFactory.createLineBorder(Color.WHITE, 1));
     }
-
 
     public void refreshPowerButtons() {
         atarToggle.setEnabled(env.hasAtar());
@@ -215,10 +194,7 @@ public class GameController {
         });
     }
 
-
-    public JComponent getView() {
-        return gameView;
-    }
+    public JComponent getView() { return gameView; }
 
     public void dispose() {
         if (gameLoop != null && gameLoop.isRunning()) gameLoop.stop();
@@ -228,24 +204,23 @@ public class GameController {
         JButton storeButton = new JButton("Store");
         storeButton.setBounds(30, 750, 100, 30);
         styleHudButton(storeButton);
-
         storeButton.addActionListener(e -> openStore());
         gameView.addCustomComponent(storeButton);
     }
 
     private void openStore() {
-        // ایجاد کنترلر استور
         StoreController storeController = new StoreController(
                 env,
                 app.getFrame(),
-                this::refreshUI // callback برای پس از بسته شدن استور
+                this::refreshUI
         );
-
         storeController.show();
     }
+
     private void refreshUI() {
-        // به‌روزرسانی UI بازی پس از بسته شدن استور
         refreshPowerButtons();
         gameView.refresh();
     }
+
+    public GameEnv getEnv() { return env; }
 }

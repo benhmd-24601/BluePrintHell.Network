@@ -405,4 +405,28 @@ public class Wire {
         double y = u*u*u*p0.y + 3*u*u*t*p1.y + 3*u*t*t*p2.y + t*t*t*p3.y;
         return new Point2D.Double(x, y);
     }
+    /** نزدیک‌ترین فاصلهٔ قوسی روی مسیر برای یک نقطهٔ دلخواه (تقریب با LUT داخلی) */
+    public double approxDistanceForPoint(double px, double py) {
+        rebuildArcCacheIfNeeded();
+        if (arcS == null || arcS.length == 0) return 0.0;
+
+        // نمونه‌برداری از LUT و انتخاب نزدیک‌ترین
+        double bestD = Double.MAX_VALUE;
+        double bestS = 0.0;
+
+        for (int i = 0; i < arcT.length; i++) {
+            double t = arcT[i];
+            Point2D.Double pt = getPointAt(t);
+            double d = Point2D.distance(px, py, pt.x, pt.y);
+            if (d < bestD) { bestD = d; bestS = arcS[i]; }
+        }
+        return bestS;
+    }
+
+    /** جایگزینی دقیق انکرها مطابق سیو (بدون heuristic) */
+    public void setAnchorsExact(java.util.List<Point2D.Double> list) {
+        anchors.clear();
+        anchors.addAll(list);
+        invalidateArcCache();
+    }
 }
