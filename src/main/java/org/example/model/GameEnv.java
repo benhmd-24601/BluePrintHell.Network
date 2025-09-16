@@ -30,15 +30,17 @@ public class GameEnv {
     private int curvePoints = 0;
 
     // «فیلد»‌هایی که روی سیم‌ها فعال می‌شوند (Aergia / Eliphas)
+
     public static class WireField {
         public enum Type { AERGIA, ELIPHAS }
         public Type type;
         public Wire wire;
         public double x, y;
         public double radius;
-        public double timeLeft; // sec
+        public long endAtMs;   // زمان پایان اثر به ms
     }
     private final List<WireField> wireFields = new ArrayList<>();
+
 
     // مُدهای موقتیِ «در حال کاشت/استفاده» (برای کلیک روی بورد)
     public enum PlacementMode {
@@ -59,8 +61,10 @@ public class GameEnv {
     public static final double SISYPHUS_COST = 15.0;
     public static final double ELIPHAS_COST = 20.0;
 
-    public static final double AERGIA_DURATION = 20.0;   // ثانیه
-    public static final double ELIPHAS_DURATION = 30.0;  // ثانیه
+    public static final long AERGIA_DURATION_MS = 20_000L;
+    public static final long ELIPHAS_DURATION_MS = 30_000L;
+
+    private static double toSeconds(double d) { return d > 5.0 ? d / 1000.0 : d; }
     public static final double AERGIA_COOLDOWN = 15.0;   // ثانیه
     public static final double AERGIA_RADIUS = 35.0;     // px
     public static final double ELIPHAS_RADIUS = 35.0;    // px
@@ -191,7 +195,7 @@ public class GameEnv {
 
         // NEW: کاهش کول‌داون Aergia و عمر فیلدها
         if (aergiaCooldown > 0) aergiaCooldown = Math.max(0, aergiaCooldown - delta);
-        updateWireFields(delta);
+        pruneExpiredFields();
 
         for (NetworkSystem s : systems) s.update();
 
@@ -210,14 +214,11 @@ public class GameEnv {
     }
     // endregion
 
-    private void updateWireFields(double delta) {
-        Iterator<WireField> it = wireFields.iterator();
-        while (it.hasNext()) {
-            WireField f = it.next();
-            f.timeLeft -= delta;
-            if (f.timeLeft <= 0) it.remove();
-        }
+    private void pruneExpiredFields() {
+        long now = System.currentTimeMillis();
+        wireFields.removeIf(f -> f.endAtMs <= now);
     }
+
 
     public boolean hasAnyWireCrossing() {
         for (Wire w : wires) {
@@ -467,13 +468,14 @@ public class GameEnv {
         f.type = type;
         f.wire = wire;
         f.x = x; f.y = y;
+
         if (type == WireField.Type.AERGIA) {
             f.radius = AERGIA_RADIUS;
-            f.timeLeft = AERGIA_DURATION;
-            aergiaCooldown = AERGIA_COOLDOWN;
+            f.endAtMs = System.currentTimeMillis() + AERGIA_DURATION_MS;
+            aergiaCooldown = AERGIA_COOLDOWN; // همچنان برحسب ثانیه
         } else {
             f.radius = ELIPHAS_RADIUS;
-            f.timeLeft = ELIPHAS_DURATION;
+            f.endAtMs = System.currentTimeMillis() + ELIPHAS_DURATION_MS;
         }
         wireFields.add(f);
         placementMode = PlacementMode.NONE;

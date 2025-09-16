@@ -1,5 +1,6 @@
 package org.example.view.render;
 
+import org.example.model.GameEnv;
 import org.example.model.Port;
 import org.example.model.Wire;
 
@@ -59,6 +60,54 @@ public class WiresRenderer implements LayerRenderer {
                 g2.setColor(Color.DARK_GRAY);
                 g2.draw(knob);
             }
+            // ===== NEW: میدان‌های فعال روی این سیم (Aergia / Eliphas)
+            var fields = ctx.getEnv().getFieldsOnWire(w);
+            for (GameEnv.WireField f : fields) {
+                int rr = (int) Math.round(f.radius);
+
+                // رنگ‌ها
+                Color ring = (f.type == GameEnv.WireField.Type.AERGIA)
+                        ? new Color(205, 120, 255, 200) // بنفش برای Aergia
+                        : new Color( 80, 220, 255, 200); // فیروزه‌ای برای Eliphas
+
+                // هاله‌ی ملایم داخل شعاع
+                Color halo = new Color(ring.getRed(), ring.getGreen(), ring.getBlue(), 40);
+                g2.setColor(halo);
+                g2.fill(new Ellipse2D.Double(f.x - rr, f.y - rr, 2.0 * rr, 2.0 * rr));
+
+                // حلقه‌ی نقطه‌چین دور شعاع
+                Stroke old = g2.getStroke();
+                g2.setStroke(new BasicStroke(
+                        2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND,
+                        1f, new float[]{6f, 6f}, 0f
+                ));
+                g2.setColor(ring);
+                g2.draw(new Ellipse2D.Double(f.x - rr, f.y - rr, 2.0 * rr, 2.0 * rr));
+                g2.setStroke(old);
+
+                // نقطهٔ مرکزی
+                g2.setColor(Color.WHITE);
+                g2.fill(new Ellipse2D.Double(f.x - 3, f.y - 3, 6, 6));
+                g2.setColor(ring.darker());
+                g2.draw(new Ellipse2D.Double(f.x - 3, f.y - 3, 6, 6));
+
+                // لیبل کوچک نوع فیلد (A/E)
+                String label = (f.type == GameEnv.WireField.Type.AERGIA) ? "A" : "E";
+                g2.setFont(g2.getFont().deriveFont(Font.BOLD, 12f));
+                FontMetrics fm = g2.getFontMetrics();
+                int tw = fm.stringWidth(label);
+                int th = fm.getAscent();
+                int lx = (int)Math.round(f.x) + 8;
+                int ly = (int)Math.round(f.y) - 8;
+
+                // پس‌زمینه‌ی نیمه‌شفاف برای لیبل
+                g2.setColor(new Color(0,0,0,120));
+                g2.fillRoundRect(lx - 4, ly - th, tw + 8, th + 6, 8, 8);
+
+                g2.setColor(ring);
+                g2.drawString(label, lx, ly);
+            }
+
         }
 
         // ===== PREVIEW DRAW =====

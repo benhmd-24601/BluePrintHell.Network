@@ -34,8 +34,9 @@ public class StoreController {
         view.updateScrollsState(env.getCoins(), env.getAergiaCooldown(), env.getCurvePoints());
     }
 
+
     private void setupListeners() {
-        // قبلی‌ها
+        // قدیمی‌ها
         view.setAtarBuyListener(e -> {
             if (env.canBuyAtar()) env.buyAtar();
             view.updateState(env.getCoins(), env.hasAtar(), env.hasAiryaman(), env.hasAnahita());
@@ -53,31 +54,28 @@ public class StoreController {
         });
         view.setBackListener(e -> closeStore());
 
-        // NEW: Scrolls & Curve Point
-        view.setAergiaListener(e -> {
-            if (env.tryStartAergiaPlacement()) {
-                // حالا کاربر باید روی سیم کلیک کند تا فیلد کاشته شود
-            }
-            view.updateScrollsState(env.getCoins(), env.getAergiaCooldown(), env.getCurvePoints());
-        });
+        // NEW: Scrolls → فقط راهنما
+        view.setAergiaListener(e ->
+                JOptionPane.showMessageDialog(frame,
+                        "Aergia: Ctrl + کلیک روی سیم.\nهزینه: 10 کوین، مدت: 20s، کول‌داون دارد.",
+                        "Scroll of Aergia", JOptionPane.INFORMATION_MESSAGE)
+        );
+        view.setEliphasListener(e ->
+                JOptionPane.showMessageDialog(frame,
+                        "Eliphas: Alt + کلیک روی سیم.\nهزینه: 20 کوین، مدت: 30s.",
+                        "Scroll of Eliphas", JOptionPane.INFORMATION_MESSAGE)
+        );
+        view.setSisyphusListener(e ->
+                JOptionPane.showMessageDialog(frame,
+                        "Sisyphus: Shift را نگه دارید، روی سیستم غیرمرجع کلیک کرده و درگ کنید.\nهزینه: 15 کوین، شعاع جابه‌جایی محدود.",
+                        "Scroll of Sisyphus", JOptionPane.INFORMATION_MESSAGE)
+        );
 
-        view.setEliphasListener(e -> {
-            if (env.tryStartEliphasPlacement()) {
-                // منتظر کلیک روی سیم
-            }
-            view.updateScrollsState(env.getCoins(), env.getAergiaCooldown(), env.getCurvePoints());
-        });
-
-        view.setSisyphusListener(e -> {
-            if (env.tryStartSisyphus()) {
-                // کاربر باید یک سیستم غیرمرجع را انتخاب و درگ کند
-            }
-            view.updateScrollsState(env.getCoins(), env.getAergiaCooldown(), env.getCurvePoints());
-        });
-
+        // خرید ظرفیت کرو
         view.setCurvePointListener(e -> {
-            env.buyCurvePoint();
-            view.updateScrollsState(env.getCoins(), env.getAergiaCooldown(), env.getCurvePoints());
+            if (env.buyCurvePoint()) {
+                view.updateScrollsState(env.getCoins(), env.getAergiaCooldown(), env.getCurvePoints());
+            }
         });
     }
 

@@ -76,10 +76,31 @@ public class StoreView extends JPanel {
         gbc.gridy = 7;
         add(curvePanel, gbc);
 
+
+        JTextArea help = new JTextArea(
+                """
+                روش استفادهٔ ابزارها:
+                • Shift + کلیک نزدیک سیم → افزودن نقطهٔ کرو (از Curve Points مصرف می‌شود)
+                • Ctrl  + کلیک روی سیم   → Scroll of Aergia (شتاب صفر؛ 20s؛ کول‌داون دارد؛ 10 کوین)
+                • Alt   + کلیک روی سیم   → Scroll of Eliphas (بازگردانی مرکز ثقل؛ 30s؛ 20 کوین)
+                • Shift نگه‌دار + کلیک روی سیستم غیرمرجع و درگ → Sisyphus (15 کوین؛ شعاع محدود و بدون نقض قیود)
+                """
+        );
+        help.setFont(new Font("Vazirmatn", Font.PLAIN, 13));
+        help.setForeground(Color.WHITE);
+        help.setOpaque(false);
+        help.setEditable(false);
+        help.setLineWrap(true);
+        help.setWrapStyleWord(true);
+        GridBagConstraints gbc1 = new GridBagConstraints();
+        gbc1.gridx = 0; gbc1.gridy = 8; gbc1.insets = new Insets(10,10,10,10);
+        gbc1.fill = GridBagConstraints.HORIZONTAL; gbc1.weightx = 1.0;
+        add(help, gbc1);
+
         backBtn = new JButton("Back");
         backBtn.setFont(f);
-        gbc.gridy = 8;
-        add(backBtn, gbc);
+        gbc1.gridy = 8;
+        add(backBtn, gbc1);
     }
 
     private JPanel createAbilityPanel(String name, int cost, JButton buyBtn, boolean owned) {
