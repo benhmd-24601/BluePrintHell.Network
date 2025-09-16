@@ -22,13 +22,13 @@ public class MouseHandler extends MouseAdapter {
     private NetworkSystem draggingSystem = null;
     private int dragOffsetX = 0, dragOffsetY = 0;
 
-    // === NEW: خم‌کردن سیم
-    private Wire bendingWire = null;           // سیمی که هندلش را درگ می‌کنیم
-    private static final int HANDLE_HIT_R = 10; // شعاع هیت‌تست برای دایره‌ی هندل
+    // === خم‌کردن سیم (Multi-Anchor)
+    private Wire bendingWire = null;          // سیمی که در حال درگِ نودش هستیم
+    private int  bendingAnchorIdx = -1;       // اندیس نودی که درگ می‌شود
+    private static final int HANDLE_HIT_R = 10; // شعاع هیت‌تست برای نود
     private static final int PATH_HIT_DIST = 6; // تلورانس نزدیکی کلیک به مسیر سیم
 
     private NetworkSystem findSystemAt(Point p) {
-        // Hit-test مستطیل بدنهٔ سیستم مطابق رندر: 120×160
         for (NetworkSystem s : env.getSystems()) {
             int x = (int) s.getX(), y = (int) s.getY();
             if (new Rectangle(x, y, 120, 160).contains(p)) return s;
@@ -62,6 +62,14 @@ public class MouseHandler extends MouseAdapter {
             lastHoverPort = hover;
         }
 
+        // --- PREVIEW: وقتی در حال کشیدن سیم هستیم، هر موو پریویو را آپدیت کن
+        if (startPort != null) {
+            Port candidateEnd = tryFindCompatibleEmptyEndPort(e.getPoint(), startPort);
+            env.setWirePreview(startPort, e.getPoint(), candidateEnd);
+        } else {
+            env.clearWirePreview();
+        }
+
         repaintCallback.run();
     }
 
@@ -69,24 +77,29 @@ public class MouseHandler extends MouseAdapter {
     public void mouseDragged(MouseEvent e) {
         currentMouse = e.getPoint();
 
-        // === NEW: در حال درگ هندل خم؟
-        if (bendingWire != null) {
-            bendingWire.setControlPoint(e.getX(), e.getY());
-            env.recalcWireBudget(); // طول مسیر ممکنه عوض بشه
+        // === اگر در حال درگ یک نود هستیم: فقط همان نود را جابجا کن (نود جدید نساز!)
+        if (bendingWire != null && bendingAnchorIdx >= 0) {
+            bendingWire.setAnchor(bendingAnchorIdx, e.getX(), e.getY());
+            env.recalcWireBudget(); // اگر طول تغییر کند
             repaintCallback.run();
             return;
         }
 
-        // اگر در حال درگ سیستم هستیم
+        // درگ سیستم؟
         if (draggingSystem != null) {
             int nx = e.getX() - dragOffsetX;
             int ny = e.getY() - dragOffsetY;
-            env.moveSystem(draggingSystem, nx, ny); // پورت‌ها و بودجه سیم به‌روز می‌شوند
+            env.moveSystem(draggingSystem, nx, ny);
             repaintCallback.run();
             return;
         }
 
-        // در غیر این صورت: اگر در حال کشیدن سیم هستیم
+        // در حال کشیدن سیم → پریویو
+        if (startPort != null) {
+            Port candidateEnd = tryFindCompatibleEmptyEndPort(e.getPoint(), startPort);
+            env.setWirePreview(startPort, e.getPoint(), candidateEnd);
+        }
+
         if (Debug.throttle("mouseDrag", 30)) {
             Debug.log("[MOUSE]", "drag (" + e.getX() + "," + e.getY() + ")");
         }
@@ -99,7 +112,7 @@ public class MouseHandler extends MouseAdapter {
         if (clickedPort != null) Debug.log("[CLICK]", "on " + portDesc(clickedPort));
         else Debug.log("[CLICK]", "canvas (" + e.getX() + "," + e.getY() + ")");
 
-        // --- Timeline hit-test (مثل قبل)
+        // --- Timeline
         int barWidth = 300, barHeight = 20;
         int barX = 1000 - barWidth - 40;
         int barY = 700 - barHeight - 40;
@@ -111,7 +124,7 @@ public class MouseHandler extends MouseAdapter {
             return;
         }
 
-        // --- اگر روی خروجی با وایر کلیک شد: حذف سریع وایر (مثل قبل)
+        // --- حذف سریع وایر
         if (clickedPort != null && clickedPort.getSide() == 1) {
             Wire wire = env.findWireByStartPort(clickedPort);
             if (wire != null) {
@@ -125,52 +138,57 @@ public class MouseHandler extends MouseAdapter {
             }
         }
 
-        // --- شروع کشیدن سیم اگر روی پورت بود
+        // --- شروع کشیدن سیم
         if (clickedPort != null) {
             startPort = clickedPort;
+            Port candidateEnd = tryFindCompatibleEmptyEndPort(e.getPoint(), startPort);
+            env.setWirePreview(startPort, e.getPoint(), candidateEnd);
+            repaintCallback.run();
             return;
         }
 
-        // === NEW: خم‌کردن سیم — اگر روی هندل موجود کلیک شد یا روی مسیر برای ساخت هندل
-        {
-            // 1) کلیک روی هندل موجود؟
-            for (Wire w : env.getWires()) {
-                if (w.hasControlPoint()) {
-                    var c = w.getControlPoint();
-                    if (dist(e.getX(), e.getY(), c.x, c.y) <= HANDLE_HIT_R) {
-                        bendingWire = w; // شروع درگ
-                        return;
-                    }
+        // === خم‌کردن سیم
+        // 1) اول روی نودهای موجود هیت‌تست کن؛ اگر روی نودی کلیک شد، همان را برای drag انتخاب کن
+        for (Wire w : env.getWires()) {
+            int n = w.getAnchorCount();
+            for (int i = 0; i < n; i++) {
+                var a = w.getAnchor(i);
+                if (dist(e.getX(), e.getY(), a.x, a.y) <= HANDLE_HIT_R) {
+                    bendingWire = w;
+                    bendingAnchorIdx = i;
+                    repaintCallback.run();
+                    return;
                 }
             }
-            // 2) کلیک نزدیک مسیر سیم → ساخت/انتخاب هندل
-            for (Wire w : env.getWires()) {
-                if (isNearWirePath(w, e.getPoint())) {
-                    if (!w.hasControlPoint()) w.setControlPoint(e.getX(), e.getY());
-                    bendingWire = w; // شروع درگ همان لحظه
+        }
+        // 2) اگر روی هیچ نودی نبودیم ولی نزدیک مسیر سیم بودیم → (فقط در صورت مجاز بودن) نود جدید بساز
+        for (Wire w : env.getWires()) {
+            if (isNearWirePath(w, e.getPoint())) {
+                int idx = w.addAnchorAtNearest(e.getX(), e.getY()); // باید max 3 را رعایت کند
+                if (idx >= 0) {
+                    bendingWire = w;
+                    bendingAnchorIdx = idx;
                     repaintCallback.run();
                     return;
                 }
             }
         }
 
-        // --- دکمه‌ی on/off گوشه‌ی سیستم‌ها (مثل قبل)
+        // --- دکمه on/off
         for (NetworkSystem s : env.getSystems()) {
             if (toggleRectFor(s).contains(e.getPoint())) {
                 boolean nowEnabled = !s.isEnabled();
                 s.setEnabled(nowEnabled);
-                // اگر setter تایمر داری:
                 try {
                     s.getClass().getMethod("setReenableTimerSec", double.class)
                             .invoke(s, nowEnabled ? 0.0 : 5.0);
-                } catch (Exception ignore) { /* اگر نداری، نادیده بگیر */ }
-
+                } catch (Exception ignore) { }
                 repaintCallback.run();
-                return; // مصرف رویداد
+                return;
             }
         }
 
-        // --- در غیر این‌صورت: شروع درگِ سیستم
+        // --- درگ سیستم
         NetworkSystem sys = findSystemAt(e.getPoint());
         if (sys != null) {
             draggingSystem = sys;
@@ -178,7 +196,6 @@ public class MouseHandler extends MouseAdapter {
             dragOffsetY = e.getY() - (int) sys.getY();
             return;
         }
-        // otherwise: هیچ کاری لازم نیست
     }
 
     private Rectangle toggleRectFor(NetworkSystem s) {
@@ -191,9 +208,10 @@ public class MouseHandler extends MouseAdapter {
 
     @Override
     public void mouseReleased(MouseEvent e) {
-        // === NEW: پایان درگِ هندل
+        // پایان درگِ نود
         if (bendingWire != null) {
             bendingWire = null;
+            bendingAnchorIdx = -1;
             repaintCallback.run();
             return;
         }
@@ -201,7 +219,7 @@ public class MouseHandler extends MouseAdapter {
         // پایان درگ سیستم
         if (draggingSystem != null) {
             draggingSystem = null;
-            env.recalcWireBudget(); // اطمینان از نهایی شدن محاسبه
+            env.recalcWireBudget();
             repaintCallback.run();
             return;
         }
@@ -220,7 +238,7 @@ public class MouseHandler extends MouseAdapter {
                     endPort.setEmpty(false);
 
                     double sx = startPort.getCenterX(), sy = startPort.getCenterY();
-                    double ex = endPort.getCenterX(), ey = endPort.getCenterY();
+                    double ex = endPort.getCenterX(),   ey = endPort.getCenterY();
 
                     java.util.List<Point> points = java.util.Collections.emptyList();
                     Wire newWire = new Wire(
@@ -238,56 +256,51 @@ public class MouseHandler extends MouseAdapter {
             }
             startPort = null;
             currentMouse = null;
+            env.clearWirePreview();
             if (endPort != null) endPort.getSystem().checkIndicator();
             repaintCallback.run();
         }
     }
 
-    public Port getStartPort() { return startPort; }
+    public Port getStartPort()     { return startPort; }
     public Point getCurrentMouse() { return currentMouse; }
 
     private Port findPortAt(Point p) {
         for (NetworkSystem sys : env.getSystems()) {
-            for (Port port : sys.getInputPorts())
-                if (port.contains(p)) return port;
-            for (Port port : sys.getOutputPorts())
-                if (port.contains(p)) return port;
+            for (Port port : sys.getInputPorts())  if (port.contains(p)) return port;
+            for (Port port : sys.getOutputPorts()) if (port.contains(p)) return port;
         }
         return null;
     }
 
-    // ====== Helpers for bending ======
+    private Port tryFindCompatibleEmptyEndPort(Point p, Port start) {
+        Port end = findPortAt(p);
+        if (end == null) return null;
+        if (start.getSystem() == end.getSystem()) return null;
+        if (!Objects.equals(start.getType(), end.getType())) return null;
+        if (!start.getIsEmpty() || !end.getIsEmpty()) return null;
+        return end;
+    }
 
+    // ====== Helpers for bending ======
     private static double dist(double x1, double y1, double x2, double y2) {
         double dx = x1 - x2, dy = y1 - y2;
         return Math.hypot(dx, dy);
     }
 
-    /** هیت‌تست نزدیکی به مسیر سیم (خط مستقیم یا منحنی کوادراتیک) */
     private boolean isNearWirePath(Wire w, Point p) {
-        if (!w.hasControlPoint()) {
-            // فاصله از خط مستقیم
-            return pointToSegmentDistance(
-                    p.x, p.y,
-                    w.getStartx(), w.getStarty(),
-                    w.getEndX(), w.getEndY()
-            ) <= PATH_HIT_DIST;
-        } else {
-            // تقریبِ منحنی: شکستن به N قطعه
-            final int N = 24;
-            double prevX = w.getStartx(), prevY = w.getStarty();
-            for (int i = 1; i <= N; i++) {
-                double t = i / (double) N;
-                var pt = w.getPointAt(t); // باید در Wire پیاده‌سازی شده باشد
-                double d = pointToSegmentDistance(p.x, p.y, prevX, prevY, pt.x, pt.y);
-                if (d <= PATH_HIT_DIST) return true;
-                prevX = pt.x; prevY = pt.y;
-            }
-            return false;
+        final int N = 24;
+        double prevX = w.getStartx(), prevY = w.getStarty();
+        for (int i = 1; i <= N; i++) {
+            double t = i / (double) N;
+            var pt = w.getPointAt(t);
+            double d = pointToSegmentDistance(p.x, p.y, prevX, prevY, pt.x, pt.y);
+            if (d <= PATH_HIT_DIST) return true;
+            prevX = pt.x; prevY = pt.y;
         }
+        return false;
     }
 
-    /** فاصلهٔ نقطه تا قطعه‌خط */
     private static double pointToSegmentDistance(double px, double py,
                                                  double x1, double y1,
                                                  double x2, double y2) {

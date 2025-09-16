@@ -8,6 +8,7 @@ import org.example.util.Debug;
 
 import javax.swing.*;
 import java.util.*;
+import java.awt.Point;
 
 public class GameEnv {
 
@@ -403,7 +404,24 @@ public class GameEnv {
         recalcWireBudget();
     }
 
+    private Port  previewStartPort = null;
+    private Point previewMouse     = null;
+    private Port  previewEndPort   = null; // اگر روی پورت compatible هستیم
 
+    // GameEnv.java  (افزودن getter/setter ها)
+    public void setWirePreview(Port start, Point mouse, Port end) {
+        this.previewStartPort = start;
+        this.previewMouse = mouse;
+        this.previewEndPort = end;
+    }
+    public void clearWirePreview() {
+        this.previewStartPort = null;
+        this.previewMouse = null;
+        this.previewEndPort = null;
+    }
+    public Port  getPreviewStartPort() { return previewStartPort; }
+    public Point getPreviewMousePoint(){ return previewMouse; }
+    public Port  getPreviewEndPort()   { return previewEndPort; }
 
 
 }

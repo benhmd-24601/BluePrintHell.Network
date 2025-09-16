@@ -1,3 +1,4 @@
+// Wire.java
 package org.example.model;
 
 import org.example.model.Packet.HeavyPacket;
@@ -8,6 +9,7 @@ import org.example.util.Debug;
 import java.awt.*;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
@@ -17,21 +19,18 @@ public class Wire {
     private final NetworkSystem endSystem;
     private final String startPortType;
     private final String endPortType;
-    private final double length; // طول اولیه‌ی خط مستقیم (برای ساخت)
+    private final double length;                 // طول اولیه (فقط برای ساخت)
     private Packet currentPacket;
-    private final double Sx, Sy, Ex, Ey; // مختصات اولیه‌ی نقاط اتصال (اگر پورت null باشد)
+    private final double Sx, Sy, Ex, Ey;         // مختصات fallback اگر پورت null شود
     private final Port startPort;
     private final Port endPort;
-    private final List<Point> points; // فعلاً استفاده نمی‌شود
+    private final List<Point> points;            // استفاده نشده
     private final GameEnv env;
 
-    // نقطه‌ی قابل‌درگ روی «خود مسیر» (anchor-on-curve) — نه کنترل‌پوینت حقیقی Bezier
-    private Point2D.Double bendAnchor = null;
+    // حداکثر 3 انکر روی مسیر
+    private final ArrayList<Point2D.Double> anchors = new ArrayList<>(3);
 
-    // فلگ قدیمی
-    private final boolean curved;
-
-    // شمارنده‌ی عبور پکت حجیم
+    private final boolean curved;                // فلگ قدیمی، بی‌استفاده‌ی عملی
     private int heavyPasses = 0;
 
     public Wire(Port startPort, Port endPort,
@@ -65,26 +64,15 @@ public class Wire {
         this.env = env;
         this.curved = curved;
     }
-    /** آیا مسیر این سیم از روی بدنه‌ی این سیستم عبور می‌کند؟ (مبدا/مقصد نادیده گرفته می‌شوند) */
+
+    //================== عبور از روی سیستم‌ها ==================
     public boolean crossesSystem(NetworkSystem sys) {
         if (sys == null) return false;
-        if (sys == startSystem || sys == endSystem) return false; // پورت‌های اتصال اجازه دارند کنار بدنه باشند
+        if (sys == startSystem || sys == endSystem) return false;
 
-        // کادر بدنه: همانی که در MouseHandler برای hit-test استفاده می‌کنی (120×160)
         Rectangle2D.Double rect = new Rectangle2D.Double(sys.getX(), sys.getY(), 120, 160);
 
-        double sx = getStartx(), sy = getStarty();
-        double ex = getEndX(),  ey = getEndY();
-
-        // اگر سیم مستقیم است
-        if (!hasControlPoint()) {
-            // اگر هر نقطه‌ی مسیر داخل مستطیل بود (به‌ندرت برای خط مستقیم) یا خط با کادر برخورد داشت
-            if (rect.contains(sx, sy) || rect.contains(ex, ey)) return true;
-            return rect.intersectsLine(sx, sy, ex, ey);
-        }
-
-        // اگر سیم خم‌شده است: نمونه‌گیری
-        final int N = 40;
+        final int N = 64;
         Point2D.Double prev = getPointAt(0.0);
         if (rect.contains(prev)) return true;
 
@@ -97,90 +85,132 @@ public class Wire {
         }
         return false;
     }
-
-    /** آیا این سیم از روی بدنه‌ی حداقل یک سیستم عبور می‌کند؟ */
     public boolean crossesAnySystem(GameEnv env) {
-        for (NetworkSystem s : env.getSystems()) {
-            if (crossesSystem(s)) return true;
-        }
+        for (NetworkSystem s : env.getSystems()) if (crossesSystem(s)) return true;
         return false;
     }
 
-    // ---------- API خم‌کردن: Anchor روی خود مسیر ----------
-    /** آیا نقطه‌ی خم (anchor-on-curve) داریم؟ */
-    public boolean hasControlPoint() { return bendAnchor != null; }
-
-    /** گرفتن anchor (روی مسیر) — برای رندر دکمه‌ی سفید */
-    public Point2D.Double getControlPoint() { return bendAnchor; }
-
-    /** ست‌کردن anchor (روی مسیر) — دایره‌ی قابل‌درگ */
-    public void setControlPoint(double x, double y) {
-        if (bendAnchor == null) bendAnchor = new Point2D.Double(x, y);
-        else { bendAnchor.x = x; bendAnchor.y = y; }
+    //================== نقاط کمکی ==================
+    /** لیست گره‌ها: Start, anchors..., End */
+    private List<Point2D.Double> knots() {
+        ArrayList<Point2D.Double> ks = new ArrayList<>(anchors.size() + 2);
+        ks.add(new Point2D.Double(getStartx(), getStarty()));
+        ks.addAll(anchors);
+        ks.add(new Point2D.Double(getEndX(), getEndY()));
+        return ks;
+    }
+    private Point2D.Double knotAt(List<Point2D.Double> ks, int i) {
+        if (i < 0) {
+            // برون‌یابی نقطهٔ قبل: P_{-1} = 2P0 - P1
+            Point2D.Double P0 = ks.get(0), P1 = ks.get(1);
+            return new Point2D.Double(2*P0.x - P1.x, 2*P0.y - P1.y);
+        } else if (i >= ks.size()) {
+            // برون‌یابی نقطهٔ بعد: P_{m+1} = 2Pm - P_{m-1}
+            Point2D.Double Pm = ks.get(ks.size()-1), Pm_1 = ks.get(ks.size()-2);
+            return new Point2D.Double(2*Pm.x - Pm_1.x, 2*Pm.y - Pm_1.y);
+        } else return ks.get(i);
     }
 
-    /** حذف خم */
-    public void clearControlPoint() { bendAnchor = null; }
-
-    /** کنترل‌پوینت حقیقی Bezier درجه‌۲ را از روی anchor در t=0.5 محاسبه می‌کند. */
-    public Point2D.Double getQuadraticControlFromAnchor() {
-        if (!hasControlPoint()) return null;
-        double sx = getStartx(), sy = getStarty();
-        double ex = getEndX(),  ey = getEndY();
-
-        // برای t=0.5: C = 2*A - 0.5*(S + E)
-        double cx = 2.0 * bendAnchor.x - 0.5 * (sx + ex);
-        double cy = 2.0 * bendAnchor.y - 0.5 * (sy + ey);
-        return new Point2D.Double(cx, cy);
+    //================== API چند-انکری ==================
+    public int getAnchorCount() { return anchors.size(); }
+    public Point2D.Double getAnchor(int idx) { return anchors.get(idx); }
+    public void setAnchor(int idx, double x, double y) {
+        if (idx < 0 || idx >= anchors.size()) return;
+        anchors.get(idx).x = x;
+        anchors.get(idx).y = y;
+        invalidateArcCache();
     }
+    /** افزودن انکر نزدیک‌ترین نقطه از مسیر (سقف 3) */
+    public int addAnchorAtNearest(double x, double y) {
+        if (anchors.size() >= 3) return -1;
 
-    /** نقطه روی مسیر برای t∈[0,1] (خط مستقیم یا منحنی درجه‌۲) */
-    public Point2D.Double getPointAt(double t) {
-        double sx = getStartx(), sy = getStarty();
-        double ex = getEndX(),  ey = getEndY();
-
-        if (!hasControlPoint()) {
-            // خط مستقیم
-            double x = sx + (ex - sx) * t;
-            double y = sy + (ey - sy) * t;
-            return new Point2D.Double(x, y);
-        } else {
-            // منحنی درجه‌۲: P(t) = (1-t)^2*S + 2(1-t)t*C + t^2*E
-            Point2D.Double C = getQuadraticControlFromAnchor();
-            double u = 1.0 - t;
-            double x = u*u*sx + 2*u*t*C.x + t*t*ex;
-            double y = u*u*sy + 2*u*t*C.y + t*t*ey;
-            return new Point2D.Double(x, y);
+        final int N = 120;
+        double bestT = 0.0, bestD = Double.MAX_VALUE;
+        for (int i = 0; i <= N; i++) {
+            double t = i / (double) N;
+            Point2D.Double pt = getPointAt(t);
+            double d = pt.distance(x, y);
+            if (d < bestD) { bestD = d; bestT = t; }
         }
+        int segs = getSegmentCount();
+        int segIdx = Math.min(segs - 1, (int) Math.floor(bestT * segs));
+        int insertIdx = Math.min(anchors.size(), segIdx);
+        anchors.add(insertIdx, new Point2D.Double(x, y));
+        invalidateArcCache();
+        return insertIdx;
+    }
+    public void removeAnchor(int idx) {
+        if (idx < 0 || idx >= anchors.size()) return;
+        anchors.remove(idx);
+        invalidateArcCache();
+    }
+    public void clearAnchors() { anchors.clear(); invalidateArcCache(); }
+
+    //================== سگمنت‌ها ==================
+    public int getSegmentCount() { return anchors.size() + 1; }
+    public Point2D.Double getSegmentStart(int seg) {
+        if (seg == 0) return new Point2D.Double(getStartx(), getStarty());
+        Point2D.Double a = anchors.get(seg-1);
+        return new Point2D.Double(a.x, a.y);
+    }
+    public Point2D.Double getSegmentEnd(int seg) {
+        if (seg == anchors.size()) return new Point2D.Double(getEndX(), getEndY());
+        Point2D.Double a = anchors.get(seg);
+        return new Point2D.Double(a.x, a.y);
     }
 
-    /** طول لحظه‌ای مسیر: مستقیم دقیق؛ منحنی با نمونه‌گیری تقریب زده می‌شود. */
+    //================== Catmull–Rom → Cubic Bezier ==================
+    /** یک بازهٔ Catmull–Rom بین Pi و Pi+1 را به کنترل‌های بزیه تبدیل می‌کند */
+    public BezierSegment getBezierForSegment(int seg) {
+        List<Point2D.Double> ks = knots();
+        int i = seg; // بین Pi و Pi+1
+        Point2D.Double Pm1 = knotAt(ks, i-1);
+        Point2D.Double P0  = knotAt(ks, i);
+        Point2D.Double P1  = knotAt(ks, i+1);
+        Point2D.Double P2  = knotAt(ks, i+2);
+
+        // فرمول استاندارد Catmull-Rom (tension = 1)
+        Point2D.Double C1 = new Point2D.Double(
+                P0.x + (P1.x - Pm1.x) / 6.0,
+                P0.y + (P1.y - Pm1.y) / 6.0
+        );
+        Point2D.Double C2 = new Point2D.Double(
+                P1.x - (P2.x - P0.x) / 6.0,
+                P1.y - (P2.y - P0.y) / 6.0
+        );
+        return new BezierSegment(P0, C1, C2, P1);
+    }
+
+    /** نقطهٔ روی بازهٔ seg با پارامتر tLocal ∈ [0..1] (ارزیابی کوبیک بزیه) */
+    public Point2D.Double getPointOnSegment(int seg, double tLocal) {
+        BezierSegment bz = getBezierForSegment(seg);
+        return cubicPoint(bz.p0, bz.c1, bz.c2, bz.p1, tLocal);
+    }
+
+    /** نقطه روی کل مسیر برای tGlobal ∈ [0..1] */
+    public Point2D.Double getPointAt(double tGlobal) {
+        int segs = getSegmentCount();
+        if (segs <= 0) return new Point2D.Double(getStartx(), getStarty());
+        double u = Math.max(0.0, Math.min(0.999999, tGlobal));
+        double f = u * segs;
+        int seg = Math.min(segs - 1, (int) Math.floor(f));
+        double tLocal = f - seg;
+        return getPointOnSegment(seg, tLocal);
+    }
+
+    /** طول مسیر با LUT قوسی */
     public double getLength() {
-        if (!hasControlPoint()) {
-            double dx = getEndX() - getStartx();
-            double dy = getEndY() - getStarty();
-            return Math.hypot(dx, dy);
-        } else {
-            double len = 0.0;
-            Point2D.Double prev = getPointAt(0.0);
-            final int N = 40; // دقت بیشتر → طول دقیق‌تر
-            for (int i = 1; i <= N; i++) {
-                double t = i / (double) N;
-                Point2D.Double pt = getPointAt(t);
-                len += pt.distance(prev);
-                prev = pt;
-            }
-            return len;
-        }
+        rebuildArcCacheIfNeeded();
+        if (arcS == null || arcS.length == 0) return 0.0;
+        return arcS[arcS.length - 1];
     }
 
+    //================== حرکت/تحویل پکت (بدون تغییر منطقی) ==================
     public boolean isCurved(){ return curved; }
     public GameEnv getEnv(){ return env; }
 
-    // ---------- حلقه‌ی سیم ----------
     public void update() {
         if (currentPacket == null && startSystem != null) {
-            // مقصد باید فعال باشد
             if (!endSystem.isEnabled()) return;
 
             Packet packet = startSystem.getNextPacketForWire(startPortType, startSystem.getAllConnectedWires());
@@ -194,7 +224,6 @@ public class Wire {
                         " compat=" + (packet.getCompatibilityKey()==null? "*" : packet.getCompatibilityKey()) +
                         "/" + startPortType);
 
-                // کُند کردن پیام‌رسان‌های ناسازگار (منطق قدیمی)
                 if (packet.getCompatibilityKey() != null &&
                         !Objects.equals(packet.getCompatibilityKey(), startPortType)) {
                     Debug.log("[WIRE]", "mismatch slow " + Debug.p(packet) +
@@ -291,4 +320,89 @@ public class Wire {
     public double getStarty() { return (startPort != null) ? startPort.getCenterY() : Sy; }
     public double getEndX()   { return (endPort   != null) ? endPort.getCenterX()   : Ex; }
     public double getEndY()   { return (endPort   != null) ? endPort.getCenterY()   : Ey; }
+
+    //================== Arc-Length LUT برای کل مسیر ==================
+    private double[] arcS = null;   // طول تجمعی
+    private double[] arcT = null;   // tGlobal متناظر
+    private boolean arcDirty = true;
+    private double cacheSx = Double.NaN, cacheSy = Double.NaN, cacheEx = Double.NaN, cacheEy = Double.NaN;
+    private int    cacheAnchorCount = -1;
+
+    public void invalidateArcCache() { arcDirty = true; }
+
+    private void rebuildArcCacheIfNeeded() {
+        double sx = getStartx(), sy = getStarty();
+        double ex = getEndX(),  ey = getEndY();
+        boolean endpointsChanged = (sx != cacheSx) || (sy != cacheSy) || (ex != cacheEx) || (ey != cacheEy);
+        boolean anchorsChanged   = (cacheAnchorCount != anchors.size());
+
+        if (!arcDirty && !endpointsChanged && !anchorsChanged && arcS != null && arcT != null) return;
+
+        int segs = getSegmentCount();
+        int M = 40; // نمونه در هر سگمنت (کیفیت طول)
+        int totalSamples = Math.max(1, segs * M);
+
+        arcS = new double[totalSamples + 1];
+        arcT = new double[totalSamples + 1];
+
+        Point2D.Double prev = getPointOnSegment(0, 0.0);
+        arcS[0] = 0.0; arcT[0] = 0.0;
+
+        int idx = 1;
+        for (int seg = 0; seg < segs; seg++) {
+            for (int j = 1; j <= M; j++) {
+                double tLocal = j / (double) M;
+                double tGlobal = (seg + tLocal) / segs;
+                Point2D.Double pt = getPointOnSegment(seg, tLocal);
+                arcS[idx] = arcS[idx - 1] + pt.distance(prev);
+                arcT[idx] = tGlobal;
+                prev = pt;
+                idx++;
+            }
+        }
+
+        cacheSx = sx; cacheSy = sy; cacheEx = ex; cacheEy = ey;
+        cacheAnchorCount = anchors.size();
+        arcDirty = false;
+    }
+
+    private double lengthToT(double s) {
+        rebuildArcCacheIfNeeded();
+        if (arcS == null || arcT == null || arcS.length == 0) return 0.0;
+
+        s = Math.max(0.0, Math.min(s, arcS[arcS.length - 1]));
+        int lo = 0, hi = arcS.length - 1;
+        while (lo < hi) {
+            int mid = (lo + hi) >>> 1;
+            if (arcS[mid] < s) lo = mid + 1; else hi = mid;
+        }
+        int i = Math.max(1, lo);
+        double s1 = arcS[i - 1], s2 = arcS[i];
+        double t1 = arcT[i - 1], t2 = arcT[i];
+        double denom = (s2 - s1);
+        double ratio = denom <= 1e-9 ? 0.0 : (s - s1) / denom;
+        return t1 + ratio * (t2 - t1);
+    }
+
+    /** نقطهٔ دقیق روی مسیر برحسب طول طی‌شده از ابتدا */
+    public Point2D.Double getPointAtDistance(double s) {
+        double t = lengthToT(s);
+        return getPointAt(t);
+    }
+
+    //================== ابزارهای بزیه ==================
+    public static class BezierSegment {
+        public final Point2D.Double p0, c1, c2, p1;
+        public BezierSegment(Point2D.Double p0, Point2D.Double c1,
+                             Point2D.Double c2, Point2D.Double p1) {
+            this.p0 = p0; this.c1 = c1; this.c2 = c2; this.p1 = p1;
+        }
+    }
+    private static Point2D.Double cubicPoint(Point2D.Double p0, Point2D.Double p1,
+                                             Point2D.Double p2, Point2D.Double p3, double t) {
+        double u = 1.0 - t;
+        double x = u*u*u*p0.x + 3*u*u*t*p1.x + 3*u*t*t*p2.x + t*t*t*p3.x;
+        double y = u*u*u*p0.y + 3*u*u*t*p1.y + 3*u*t*t*p2.y + t*t*t*p3.y;
+        return new Point2D.Double(x, y);
+    }
 }
