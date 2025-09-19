@@ -8,7 +8,7 @@ public class  Main {
         SwingUtilities.invokeLater(() -> {
             new AppController().start(); // فقط بوت‌استرپ
         });
-        //checking
+        //check check
     }
 }
     
